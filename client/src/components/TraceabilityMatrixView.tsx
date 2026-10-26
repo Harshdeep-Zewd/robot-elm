@@ -193,7 +193,8 @@ export const TraceabilityMatrixView: React.FC<TraceabilityMatrixViewProps> = ({
                     );
                   })}
                 </tr>
-              ))}
+              );
+            })}
             </tbody>
           </table>
         ) : (
