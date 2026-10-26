@@ -1223,6 +1223,44 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                           👤 {obj.owner_name || 'Zewd'}
                         </span>
 
+                        {/* Quick Open in Console for Test Runs */}
+                        {isTestRunTracker && (onNavigateToTestRun || onNavigateView) && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onNavigateToTestRun) {
+                                const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                                const targetId = matchingRun ? matchingRun.id : obj.id;
+                                onNavigateToTestRun(targetId);
+                              } else if (onNavigateView) {
+                                onNavigateView('TEST_EXECUTION');
+                              }
+                            }}
+                            title="Open in Test Execution Console"
+                            style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              backgroundColor: '#0284c7',
+                              color: '#ffffff',
+                              border: 'none',
+                              padding: '5px 12px',
+                              borderRadius: '6px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              boxShadow: '0 2px 5px rgba(2, 132, 199, 0.3)',
+                              transition: 'all 0.15s ease'
+                            }}
+                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
+                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
+                          >
+                            <Play size={12} fill="#ffffff" />
+                            <span>Open in Console</span>
+                          </button>
+                        )}
+
                         {/* Delete Button */}
                         {onDeleteObject && (
                           <button
@@ -1809,25 +1847,37 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                 </span>
                               </div>
 
-                              {onNavigateView && (
+                              {(onNavigateToTestRun || onNavigateView) && (
                                 <button
                                   type="button"
-                                  onClick={() => onNavigateView('TEST_EXECUTION')}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: '6px',
-                                    backgroundColor: 'var(--primary)',
-                                    color: '#fff',
-                                    border: 'none',
-                                    padding: '6px 14px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.8rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer'
+                                  onClick={() => {
+                                    if (onNavigateToTestRun) {
+                                      const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                                      const targetId = matchingRun ? matchingRun.id : obj.id;
+                                      onNavigateToTestRun(targetId);
+                                    } else if (onNavigateView) {
+                                      onNavigateView('TEST_EXECUTION');
+                                    }
                                   }}
+                                  style={{
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '8px',
+                                    backgroundColor: '#0284c7',
+                                    color: '#ffffff',
+                                    border: 'none',
+                                    padding: '8px 16px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.82rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
+                                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
                                 >
-                                  <Play size={12} />
+                                  <Play size={14} fill="#ffffff" />
                                   <span>Open in Test Execution Console</span>
                                 </button>
                               )}
@@ -2072,7 +2122,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
               })()}
 
               {/* Quick Action for Test Runs */}
-              {isTestRunTracker && onNavigateView && (
+              {isTestRunTracker && (onNavigateToTestRun || onNavigateView) && (
                 <div style={{
                   backgroundColor: 'rgba(16, 185, 129, 0.05)',
                   border: '1px solid rgba(16, 185, 129, 0.35)',
@@ -2084,25 +2134,37 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   </div>
                   <button
                     type="button"
-                    onClick={() => onNavigateView('TEST_EXECUTION')}
+                    onClick={() => {
+                      if (onNavigateToTestRun && activeObject) {
+                        const matchingRun = testRuns.find(r => r.id === activeObject.id || r.name === activeObject.title);
+                        const targetId = matchingRun ? matchingRun.id : activeObject.id;
+                        onNavigateToTestRun(targetId);
+                      } else if (onNavigateView) {
+                        onNavigateView('TEST_EXECUTION');
+                      }
+                    }}
                     style={{
                       width: '100%',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '6px',
-                      padding: '8px 12px',
+                      gap: '8px',
+                      padding: '8px 14px',
                       borderRadius: '6px',
-                      backgroundColor: 'var(--primary)',
-                      color: '#fff',
-                      fontSize: '0.78rem',
+                      backgroundColor: '#0284c7',
+                      color: '#ffffff',
+                      fontSize: '0.82rem',
                       fontWeight: 700,
                       border: 'none',
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)',
+                      transition: 'all 0.15s ease'
                     }}
+                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
+                    onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
                   >
-                    <Play size={13} />
-                    <span>Open in Execution Console</span>
+                    <Play size={14} fill="#ffffff" />
+                    <span>Open in Test Execution Console</span>
                   </button>
                 </div>
               )}

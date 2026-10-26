@@ -287,6 +287,17 @@ const INITIAL_OBJECTS: EngineeringObject[] = [
     version: 1,
     metadata: { targetRelease: 'Release 2.4' },
     created_at: new Date().toISOString(), updated_at: new Date().toISOString()
+  },
+  {
+    id: 10, tracker_id: 67, tracker_name: 'System Qualification Test Runs', folder_id: 10, folder_name: 'ISO 13482 Release 2.4 Qualification', object_key: 'ROBO-SQTR-001',
+    title: 'Safety & ISO 13482 Validation Run #1',
+    description: 'Execution test run generated from Test Set [TST-SET-001] "Safety & ISO 13482 Validation Test Set". Contains 2 included test cases (Dynamic Pedestrian Avoidance & Latency Test, Emergency Stop Braking Distance Field Test).',
+    type: 'TEST_RUN', requirement_type: 'Non-Functional Requirement', safety_level: 'ASIL-D', test_subprocess: 'System Testing',
+    status: 'PASS', priority: 'CRITICAL', owner_id: 1, owner_name: 'Zewd', created_by_name: 'Zewd',
+    pre_action: 'Target Test Set: [TST-SET-001] Safety & ISO 13482 Validation Test Set',
+    post_action: 'Procedure results recorded in single Test Runs tracker. All 2 test cases PASSED.',
+    version: 1,
+    created_at: new Date().toISOString(), updated_at: new Date().toISOString()
   }
 ];
 
@@ -297,7 +308,8 @@ const INITIAL_RELATIONSHIPS: Relationship[] = [
   { id: 4, source_id: 2, target_id: 8, relationship_type: 'VERIFIED_BY' },
   { id: 5, source_id: 1, target_id: 5, relationship_type: 'ALLOCATED_TO' },
   { id: 6, source_id: 7, target_id: 9, relationship_type: 'INCLUDED_IN' },
-  { id: 7, source_id: 8, target_id: 9, relationship_type: 'INCLUDED_IN' }
+  { id: 7, source_id: 8, target_id: 9, relationship_type: 'INCLUDED_IN' },
+  { id: 8, source_id: 10, target_id: 9, relationship_type: 'EXECUTED_FROM' }
 ];
 
 const INITIAL_TEST_STEPS: TestStep[] = [
@@ -467,6 +479,7 @@ const INITIAL_TEST_RUN_DETAILS: Record<number, any> = {
     ]
   }
 };
+INITIAL_TEST_RUN_DETAILS[10] = { ...INITIAL_TEST_RUN_DETAILS[1], id: 10 };
 
 
 const ZEWD_USER: User = {
@@ -937,6 +950,96 @@ export const App: React.FC = () => {
     localStorage.setItem('roboserv_elm_test_run_details', JSON.stringify(testRunDetailsMap));
   }, [testRunDetailsMap, currentUser]);
 
+  // Bidirectional Synchronization & Reconciliation between SQTR tracker objects and testRuns
+  useEffect(() => {
+    const sqtrTracker = currentTrackers.find(t =>
+      t.key === 'SQTR' ||
+      cleanTrackerName(t.name).toLowerCase() === 'system qualification test runs' ||
+      cleanTrackerName(t.name).toLowerCase() === 'test runs' ||
+      t.key === 'TR_GEN'
+    );
+    if (!sqtrTracker) return;
+
+    let objectsChanged = false;
+    let newObjects = [...allObjects];
+    let runsChanged = false;
+    let newRuns = [...testRuns];
+
+    // 1. Ensure every TestRun in current project has a corresponding EngineeringObject in SQTR tracker
+    const projectRuns = testRuns.filter(r => r.project_id === (activeProject?.id || 1));
+    const sqtrObjects = newObjects.filter(o => o.tracker_id === sqtrTracker.id);
+
+    projectRuns.forEach((run) => {
+      const matchingObj = sqtrObjects.find(o =>
+        o.id === run.id ||
+        o.title === run.name ||
+        o.title === `Test Run for ${run.test_set_title}` ||
+        (run.name && o.title?.toLowerCase() === run.name.toLowerCase())
+      );
+      if (!matchingObj) {
+        const seq = sqtrObjects.length + 1;
+        const prefix = sqtrTracker.prefix || `${activeProject?.key || 'ROBO'}-SQTR-`;
+        const objKey = `${prefix}${String(seq).padStart(3, '0')}`;
+        const newObj: EngineeringObject = {
+          id: run.id,
+          tracker_id: sqtrTracker.id,
+          tracker_name: sqtrTracker.name,
+          folder_id: run.test_set_id || null,
+          folder_name: run.test_set_title || 'General',
+          object_key: objKey,
+          title: run.name || `Test Run #${run.id}`,
+          description: `Execution test run for [${run.test_set_key || 'TST-SET'}] ${run.test_set_title || ''}. Config: ${run.config_name || 'Standard'}.`,
+          type: 'TEST_RUN',
+          requirement_type: 'Non-Functional Requirement',
+          safety_level: 'SIL-2',
+          test_subprocess: 'System Testing',
+          status: run.overall_status || 'PASS',
+          priority: 'HIGH',
+          owner_id: currentUser?.id || 1,
+          owner_name: run.tester_name || currentUser?.name || 'Zewd',
+          created_by_name: run.tester_name || currentUser?.name || 'Zewd',
+          pre_action: `Target Test Set: ${run.test_set_title || run.test_set_key || 'Standard'}`,
+          post_action: `Execution status: ${run.overall_status || 'PASS'}`,
+          version: 1,
+          created_at: run.started_at || new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+        newObjects.unshift(newObj);
+        objectsChanged = true;
+      }
+    });
+
+    // 2. Ensure every SQTR EngineeringObject has a corresponding TestRun in testRuns
+    sqtrObjects.forEach(obj => {
+      const matchingRun = newRuns.find(r => r.id === obj.id || r.name === obj.title);
+      if (!matchingRun) {
+        const newRun: TestRun = {
+          id: obj.id,
+          project_id: activeProject?.id || 1,
+          test_set_id: obj.folder_id || 9,
+          test_config_id: 1,
+          name: obj.title,
+          overall_status: (obj.status as any) || 'PASS',
+          tester_name: obj.owner_name || 'Zewd',
+          test_set_key: 'TST-SET-001',
+          test_set_title: obj.folder_name || 'System Test Set',
+          config_name: `${activeProject?.name || 'RoboServ-X1'} Hardware Configuration`,
+          software_version: 'v1.0.0-release',
+          started_at: obj.created_at || new Date().toISOString()
+        };
+        newRuns.unshift(newRun);
+        runsChanged = true;
+      }
+    });
+
+    if (objectsChanged) {
+      setAllObjects(newObjects);
+    }
+    if (runsChanged) {
+      setTestRuns(newRuns);
+    }
+  }, [currentTrackers, activeProject?.id, allObjects.length, testRuns.length]);
+
   const handleSelectProject = (p: Project) => {
     setActiveProjectId(p.id);
     const pTrackers = allTrackers.filter(t => t.project_id === p.id);
@@ -1265,6 +1368,19 @@ export const App: React.FC = () => {
     setActiveView('TEST_EXECUTION');
   };
 
+  const handleBackToSQTR = () => {
+    const sqtr = currentTrackers.find(t =>
+      t.key === 'SQTR' ||
+      cleanTrackerName(t.name).toLowerCase() === 'system qualification test runs' ||
+      cleanTrackerName(t.name).toLowerCase() === 'test runs' ||
+      t.key === 'TR_GEN'
+    );
+    if (sqtr) {
+      setSelectedTrackerId(sqtr.id);
+    }
+    setActiveView('TRACKER');
+  };
+
   const handleCreateTestRunFromSet = (testSet: EngineeringObject) => {
     // 1. Resolve folder name of test set and name format based on test set title
     const folder = allFolders.find(f => f.id === testSet.folder_id);
@@ -1272,12 +1388,12 @@ export const App: React.FC = () => {
     const testSetName = testSet.title?.trim() || testSet.object_key;
     const runName = `Test Run for ${testSetName}`;
 
-    // 2. Find single test run tracker for current project
+    // 2. Find single test run tracker for current project (SQTR prioritized)
     let testRunTracker = currentTrackers.find(t =>
-      t.key === 'TR_GEN' ||
-      cleanTrackerName(t.name).toLowerCase() === 'test runs' ||
-      t.name.toLowerCase() === 'test runs' ||
       t.key === 'SQTR' ||
+      cleanTrackerName(t.name).toLowerCase() === 'system qualification test runs' ||
+      cleanTrackerName(t.name).toLowerCase() === 'test runs' ||
+      t.key === 'TR_GEN' ||
       t.type === 'TEST_RUN'
     );
 
@@ -1294,7 +1410,7 @@ export const App: React.FC = () => {
     // 4. Create new Engineering Object in testRunTracker
     const existingRunObjs = currentProjectObjects.filter(o => o.tracker_id === testRunTracker!.id);
     const nextSeq = existingRunObjs.length + 1;
-    const prefix = testRunTracker?.prefix || `${activeProject?.key || 'ROBO'}-TR-`;
+    const prefix = testRunTracker?.prefix || `${activeProject?.key || 'ROBO'}-SQTR-`;
     const newObjKey = `${prefix}${String(nextSeq).padStart(3, '0')}`;
     const newRunId = Date.now();
 
@@ -1565,6 +1681,7 @@ export const App: React.FC = () => {
               onUpdateTestRuns={setTestRuns}
               onUpdateRunDetailsMap={setTestRunDetailsMap}
               onBack={() => setActiveView('DASHBOARD')}
+              onBackToSQTR={handleBackToSQTR}
               onNavigateView={(view) => setActiveView(view)}
               selectedRunIdProp={selectedTestRunId}
               onSelectRunIdProp={setSelectedTestRunId}

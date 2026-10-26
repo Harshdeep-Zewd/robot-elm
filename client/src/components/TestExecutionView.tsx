@@ -15,6 +15,7 @@ interface TestExecutionViewProps {
   onUpdateTestRuns?: React.Dispatch<React.SetStateAction<TestRun[]>>;
   onUpdateRunDetailsMap?: React.Dispatch<React.SetStateAction<Record<number, any>>>;
   onBack?: () => void;
+  onBackToSQTR?: () => void;
   onNavigateView?: (view: any) => void;
   selectedRunIdProp?: number | null;
   onSelectRunIdProp?: (id: number | null) => void;
@@ -32,6 +33,7 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   onUpdateTestRuns,
   onUpdateRunDetailsMap,
   onBack,
+  onBackToSQTR,
   onNavigateView,
   selectedRunIdProp,
   onSelectRunIdProp
@@ -331,11 +333,67 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   const activeRunDetail = selectedRunId ? testRunDetailsMap[selectedRunId] : null;
 
   return (
-    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
-      {/* Test Runs Sidebar */}
-      <div style={{ width: '300px', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-sidebar)', padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
-        {/* Navigation back buttons */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 60px)', width: '100%', overflow: 'hidden' }}>
+      {/* Top Navigation & Breadcrumb Bar */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        padding: '12px 24px',
+        backgroundColor: 'var(--bg-card)',
+        borderBottom: '1px solid var(--border-color)',
+        gap: '16px',
+        flexWrap: 'wrap'
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          {/* Back to Test Runs Tracker Button */}
+          {onBackToSQTR ? (
+            <button
+              type="button"
+              onClick={onBackToSQTR}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#0284c7',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                padding: '7px 14px',
+                borderRadius: '6px',
+                boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)',
+                transition: 'all 0.15s ease'
+              }}
+              title="Return to System Qualification Test Runs Dashboard"
+            >
+              <ArrowLeft size={15} />
+              <span>← Back to Test Runs Tracker</span>
+            </button>
+          ) : onNavigateView ? (
+            <button
+              type="button"
+              onClick={() => onNavigateView('TRACKER')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                backgroundColor: '#0284c7',
+                border: 'none',
+                color: '#ffffff',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                padding: '7px 14px',
+                borderRadius: '6px'
+              }}
+            >
+              <ArrowLeft size={15} />
+              <span>← Back to Trackers</span>
+            </button>
+          ) : null}
+
           {onBack && (
             <button
               type="button"
@@ -343,129 +401,51 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
-                gap: '5px',
-                backgroundColor: 'var(--bg-card)',
+                gap: '6px',
+                backgroundColor: 'var(--bg-dark)',
                 border: '1px solid var(--border-color)',
-                color: 'var(--text-main)',
-                fontSize: '0.75rem',
+                color: 'var(--text-muted)',
+                fontSize: '0.78rem',
                 fontWeight: 600,
                 cursor: 'pointer',
-                padding: '5px 10px',
+                padding: '7px 12px',
                 borderRadius: '6px',
                 transition: 'all 0.15s ease'
               }}
               title="Back to Project Dashboard"
             >
-              <ArrowLeft size={13} />
               <span>Dashboard</span>
             </button>
           )}
 
-          {onNavigateView && (
-            <button
-              type="button"
-              onClick={() => onNavigateView('TRACKER')}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: '5px',
-                backgroundColor: 'var(--bg-card)',
-                border: '1px solid var(--border-color)',
-                color: 'var(--text-muted)',
-                fontSize: '0.75rem',
-                fontWeight: 600,
-                cursor: 'pointer',
-                padding: '5px 10px',
-                borderRadius: '6px',
-                transition: 'all 0.15s ease'
-              }}
-              title="Open Engineering Trackers"
-            >
-              <Layers size={13} />
-              <span>Trackers</span>
-            </button>
-          )}
+          <div style={{ height: '20px', width: '1px', backgroundColor: 'var(--border-color)' }} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--text-muted)', fontWeight: 700 }}>
+              Test Execution Console
+            </span>
+            {activeRunDetail && (
+              <>
+                <ChevronRight size={14} color="var(--text-muted)" />
+                <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+                  {activeRunDetail.name}
+                </span>
+              </>
+            )}
+          </div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-          <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-            Test Runs ({projectRuns.length})
-          </span>
-        </div>
-
-        {/* Prominent + New Test Run Button */}
-        <button
-          onClick={handleOpenCreateModal}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            backgroundColor: 'var(--primary)',
-            color: '#fff',
-            border: 'none',
-            padding: '10px',
-            borderRadius: '8px',
-            fontWeight: 700,
-            fontSize: '0.85rem',
-            cursor: 'pointer',
-            marginBottom: '16px',
-            boxShadow: '0 4px 12px rgba(2, 132, 199, 0.3)'
-          }}
-        >
-          <Plus size={16} />
-          <span>+ New Test Run</span>
-        </button>
-
-        {/* Runs List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto' }}>
-          {projectRuns.length > 0 ? (
-            projectRuns.map((r) => (
-              <div
-                key={r.id}
-                onClick={() => setSelectedRunId(r.id)}
-                style={{
-                  padding: '12px',
-                  borderRadius: '8px',
-                  backgroundColor: selectedRunId === r.id ? 'var(--bg-hover)' : 'var(--bg-card)',
-                  border: `1px solid ${selectedRunId === r.id ? 'var(--accent-cyan)' : 'var(--border-color)'}`,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: selectedRunId === r.id ? 'var(--accent-cyan)' : 'var(--text-main)', marginBottom: '4px' }}>
-                  {r.name}
-                </div>
-
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Layers size={12} color="var(--accent-cyan)" />
-                  <span>Test Set: <strong className="mono">{r.test_set_key || 'TST-SET-001'}</strong></span>
-                </div>
-
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <User size={12} />
-                  <span>Tester: {r.tester_name || 'Zewd'}</span>
-                </div>
-
-                <div style={{ marginTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span className={`badge badge-${(r.overall_status || 'PASS').toLowerCase().replace(/_/g, '-')}`}>
-                    {r.overall_status || 'PASS'}
-                  </span>
-                  <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
-                    {r.started_at ? new Date(r.started_at).toLocaleDateString() : 'Today'}
-                  </span>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', textAlign: 'center', padding: '20px 10px' }}>
-              No test runs created for project <strong>{activeProject?.name}</strong> yet.
-            </div>
-          )}
-        </div>
+        {activeRunDetail && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Overall Status:</span>
+            <span className={`badge badge-${(activeRunDetail.overall_status || 'PASS').toLowerCase().replace(/_/g, '-')}`} style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+              {activeRunDetail.overall_status || 'PASS'}
+            </span>
+          </div>
+        )}
       </div>
 
-      {/* Main Step Execution Interface */}
+      {/* Main Step Execution Interface - Focused solely on the active test run (Yellow Box) */}
       <div style={{ flex: 1, padding: '24px', overflowY: 'auto', backgroundColor: 'var(--bg-dark)' }}>
         {activeRunDetail ? (
           <div>
