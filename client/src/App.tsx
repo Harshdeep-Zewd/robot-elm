@@ -1259,6 +1259,143 @@ export const App: React.FC = () => {
     if (tracker) setSelectedTrackerId(tracker.id);
   };
 
+  const handleCreateTestRunFromSet = (testSet: EngineeringObject) => {
+    // 1. Resolve folder name of test set
+    const folder = allFolders.find(f => f.id === testSet.folder_id);
+    const folderName = testSet.folder_name || folder?.name || 'General';
+    const runName = `Test Run for ${folderName}`;
+
+    // 2. Find single test run tracker for current project
+    let testRunTracker = currentTrackers.find(t =>
+      t.key === 'TR_GEN' ||
+      cleanTrackerName(t.name).toLowerCase() === 'test runs' ||
+      t.name.toLowerCase() === 'test runs' ||
+      t.key === 'SQTR' ||
+      t.type === 'TEST_RUN'
+    );
+
+    if (!testRunTracker) {
+      testRunTracker = currentTrackers.find(t => t.name.toLowerCase().includes('run')) || currentTrackers[0];
+    }
+
+    // 3. Find test cases included in this test set
+    const incRels = relationships.filter(r => r.target_id === testSet.id && r.relationship_type === 'INCLUDED_IN');
+    const includedCases = incRels
+      .map(r => currentProjectObjects.find(o => o.id === r.source_id))
+      .filter(Boolean) as EngineeringObject[];
+
+    // 4. Create new Engineering Object in testRunTracker
+    const existingRunObjs = currentProjectObjects.filter(o => o.tracker_id === testRunTracker!.id);
+    const nextSeq = existingRunObjs.length + 1;
+    const prefix = testRunTracker?.prefix || `${activeProject?.key || 'ROBO'}-TR-`;
+    const newObjKey = `${prefix}${String(nextSeq).padStart(3, '0')}`;
+    const newRunId = Date.now();
+
+    const newRunObj: EngineeringObject = {
+      id: newRunId,
+      tracker_id: testRunTracker!.id,
+      tracker_name: testRunTracker!.name,
+      folder_id: testSet.folder_id || null,
+      folder_name: folderName,
+      object_key: newObjKey,
+      title: runName,
+      description: `Execution test run generated from Test Set [${testSet.object_key}] "${testSet.title}". Contains ${includedCases.length} included test cases.`,
+      type: 'TEST_RUN',
+      requirement_type: 'Non-Functional Requirement',
+      safety_level: testSet.safety_level || 'SIL-2',
+      test_subprocess: 'System Testing',
+      status: 'NOT_RUN',
+      priority: testSet.priority || 'HIGH',
+      owner_id: currentUser?.id || 1,
+      owner_name: currentUser?.name || 'Zewd',
+      created_by_name: currentUser?.name || 'Zewd',
+      pre_action: `Target Test Set: [${testSet.object_key}] ${testSet.title}`,
+      post_action: `Procedure results recorded in single Test Runs tracker.`,
+      version: 1,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+
+    // 5. Create TestRun entity for TestExecutionView engine
+    const newTestRun: TestRun = {
+      id: newRunId,
+      project_id: activeProject?.id || 1,
+      test_set_id: testSet.id,
+      test_config_id: 1,
+      name: runName,
+      overall_status: 'NOT_RUN',
+      tester_name: currentUser?.name || 'Zewd',
+      test_set_key: testSet.object_key,
+      test_set_title: testSet.title,
+      config_name: `${activeProject?.name || 'RoboServ-X1'} Hardware Configuration`,
+      software_version: 'v1.0.0-release',
+      started_at: new Date().toISOString()
+    };
+
+    // Map caseResults
+    const caseResults = (includedCases.length > 0 ? includedCases : [testSet]).map(tc => {
+      const tcSteps = testSteps.filter(s => s.test_case_id === tc.id);
+      return {
+        id: Date.now() + tc.id,
+        test_run_id: newRunId,
+        test_case_id: tc.id,
+        case_key: tc.object_key,
+        case_title: tc.title,
+        status: 'NOT_RUN' as const,
+        steps: tcSteps.length > 0 ? tcSteps.map(s => ({
+          id: s.id * 100 + newRunId,
+          test_run_result_id: Date.now() + tc.id,
+          test_step_id: s.id,
+          step_number: s.step_number,
+          action: s.action,
+          expected_result: s.expected_result,
+          status: 'NOT_RUN' as const,
+          actual_result: ''
+        })) : [
+          {
+            id: Date.now() + 500,
+            test_run_result_id: Date.now() + tc.id,
+            test_step_id: 1,
+            step_number: 1,
+            action: `Execute verification procedure for ${tc.title}`,
+            expected_result: `System operates in compliance with ${tc.object_key} specification`,
+            status: 'NOT_RUN' as const,
+            actual_result: ''
+          }
+        ]
+      };
+    });
+
+    const detailObj = {
+      id: newRunId,
+      name: runName,
+      test_set_key: testSet.object_key,
+      test_set_title: testSet.title,
+      config_name: newTestRun.config_name,
+      software_version: newTestRun.software_version,
+      tester_name: newTestRun.tester_name,
+      overall_status: 'NOT_RUN',
+      caseResults
+    };
+
+    // Update states
+    setAllObjects(prev => [newRunObj, ...prev]);
+    setTestRuns(prev => [newTestRun, ...prev]);
+    setTestRunDetailsMap(prev => ({ ...prev, [newRunId]: detailObj }));
+
+    // Relationship: new run object EXECUTED_FROM test set
+    const newRel: Relationship = {
+      id: Date.now() + 1,
+      source_id: newRunId,
+      target_id: testSet.id,
+      relationship_type: 'EXECUTED_FROM'
+    };
+    setRelationships(prev => [...prev, newRel]);
+    setAllTrackers(prev => prev.map(t => t.id === testRunTracker!.id ? { ...t, object_count: (t.object_count || 0) + 1 } : t));
+
+    return { newRunObj, newTestRun, testRunTracker: testRunTracker! };
+  };
+
   const handleSelectObjectForImpact = (objId: number) => {
     setImpactObjectId(objId);
     setActiveView('IMPACT');
@@ -1367,9 +1504,11 @@ export const App: React.FC = () => {
               objects={allObjects.filter(o => o.tracker_id === selectedTracker.id)}
               allObjects={currentProjectObjects}
               folders={allFolders.filter(f => f.tracker_id === selectedTracker.id)}
+              allTrackers={currentTrackers}
               relationships={relationships}
               testSteps={testSteps}
               artifacts={currentProjectArtifacts}
+              testRuns={testRuns}
               onCreateFolder={handleCreateFolder}
               onCreateObject={handleCreateObject}
               onUpdateObject={handleUpdateObject}
@@ -1381,6 +1520,12 @@ export const App: React.FC = () => {
               onAddArtifact={handleAddArtifact}
               onDeleteArtifact={handleDeleteArtifact}
               onSelectObjectForImpact={handleSelectObjectForImpact}
+              onCreateTestRun={handleCreateTestRunFromSet}
+              onNavigateTracker={(tracker, objId) => {
+                setSelectedTrackerId(tracker.id);
+                setActiveView('TRACKER');
+              }}
+              onNavigateView={(view) => setActiveView(view)}
               onBackToDashboard={() => setActiveView('DASHBOARD')}
             />
           )}

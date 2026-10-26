@@ -330,5 +330,31 @@ export function buildDemoRelationships(objects: EngineeringObject[]): Relationsh
     rels.push({ id: 1003, source_id: objects[0].id, target_id: objects[4].id, relationship_type: 'VERIFIED_BY' });
     rels.push({ id: 1004, source_id: objects[3].id, target_id: objects[0].id, relationship_type: 'MITIGATED_BY' });
   }
+
+  // Link demo test cases to demo test set
+  const demoTestSets = objects.filter(o =>
+    o.type === 'TEST_SET' ||
+    o.object_key.includes('SET') ||
+    o.tracker_name.toLowerCase().includes('test set')
+  );
+  const demoTestCases = objects.filter(o =>
+    o.type === 'TEST_CASE' ||
+    o.object_key.includes('TST') ||
+    o.object_key.includes('TC') ||
+    o.tracker_name.toLowerCase().includes('test case')
+  );
+
+  if (demoTestSets.length > 0 && demoTestCases.length > 0) {
+    const primarySet = demoTestSets[0];
+    demoTestCases.slice(0, 3).forEach((tc, idx) => {
+      rels.push({
+        id: 2000 + idx,
+        source_id: tc.id,
+        target_id: primarySet.id,
+        relationship_type: 'INCLUDED_IN'
+      });
+    });
+  }
+
   return rels;
 }

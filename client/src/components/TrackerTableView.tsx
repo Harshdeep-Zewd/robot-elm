@@ -3,7 +3,7 @@ import {
   Plus, Folder, FolderPlus, ChevronRight, ChevronDown, ListOrdered, Paperclip,
   CheckSquare, Trash2, Search, Save, ArrowRight, ArrowLeft, Link as LinkIcon,
   ShieldAlert, Activity, FileText, Download, CheckCircle2, AlertTriangle,
-  Layers, UploadCloud, ExternalLink, X, Clock, User, ChevronUp
+  Layers, UploadCloud, ExternalLink, X, Clock, User, ChevronUp, Play
 } from 'lucide-react';
 import {
   Tracker, Folder as FolderType, EngineeringObject, RequirementType,
@@ -20,9 +20,11 @@ interface TrackerTableViewProps {
   objects: EngineeringObject[];
   allObjects: EngineeringObject[];
   folders: FolderType[];
+  allTrackers?: Tracker[];
   relationships: Relationship[];
   testSteps?: TestStep[];
   artifacts?: Artifact[];
+  testRuns?: any[];
   onCreateFolder?: (tracker_id: number, name: string) => number | void;
   onCreateObject: (data: {
     tracker_id: number;
@@ -57,6 +59,9 @@ interface TrackerTableViewProps {
   onAddArtifact?: (data: { object_id?: number; filename: string; category: any; file_size?: number; stored_path?: string }) => void;
   onDeleteArtifact?: (id: number) => void;
   onSelectObjectForImpact?: (objId: number) => void;
+  onCreateTestRun?: (testSet: EngineeringObject) => { newRunObj: EngineeringObject; newTestRun: any; testRunTracker: Tracker };
+  onNavigateTracker?: (tracker: Tracker, objectId?: number) => void;
+  onNavigateView?: (view: any) => void;
   onBackToDashboard?: () => void;
 }
 
@@ -65,9 +70,11 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   objects,
   allObjects,
   folders,
+  allTrackers = [],
   relationships,
   testSteps = [],
   artifacts = [],
+  testRuns = [],
   onCreateFolder,
   onCreateObject,
   onUpdateObject,
@@ -79,6 +86,9 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   onAddArtifact,
   onDeleteArtifact,
   onSelectObjectForImpact,
+  onCreateTestRun,
+  onNavigateTracker,
+  onNavigateView,
   onBackToDashboard
 }) => {
   // Navigation & Filter state
@@ -150,7 +160,59 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   const [newFileCategory, setNewFileCategory] = useState<'PDF' | 'CAD' | 'CSV' | 'OTHER'>('PDF');
 
   const isTestCaseTracker = tracker.enable_test_steps ?? (tracker.type === 'TEST_CASE' || tracker.key === 'SYS-TST' || tracker.prefix.includes('TST-'));
-  const isTestSetTracker = tracker.type === 'TEST_SET' || tracker.key === 'TST-SET' || tracker.prefix.includes('SET-');
+  const isTestSetTracker =
+    tracker.type === 'TEST_SET' ||
+    tracker.key === 'TST-SET' ||
+    tracker.key.includes('SET') ||
+    tracker.prefix.includes('SET-') ||
+    tracker.name.toLowerCase().includes('test set') ||
+    cleanTrackerName(tracker.name).toLowerCase().includes('test set');
+
+  const isTestRunTracker =
+    tracker.key === 'TR_GEN' ||
+    tracker.key === 'SQTR' ||
+    tracker.type === 'TEST_RUN' ||
+    tracker.name.toLowerCase().includes('test run') ||
+    cleanTrackerName(tracker.name).toLowerCase() === 'test runs';
+
+  // Test Set Grouping Modal State
+  const [managingTestSet, setManagingTestSet] = useState<EngineeringObject | null>(null);
+  const [testCaseSearch, setTestCaseSearch] = useState('');
+
+  // Created Run Feedback Toast State
+  const [createdRunToast, setCreatedRunToast] = useState<{
+    runName: string;
+    trackerName: string;
+    runObjId: number;
+    runId: number;
+    testRunTracker: Tracker;
+  } | null>(null);
+
+  const handleTriggerCreateTestRun = (testSet: EngineeringObject) => {
+    if (!onCreateTestRun) return;
+
+    const incRels = relationships.filter(r => r.target_id === testSet.id && r.relationship_type === 'INCLUDED_IN');
+    if (incRels.length === 0) {
+      const proceed = window.confirm(
+        `This Test Set currently has 0 test cases added.\n\nWould you like to add test cases first, or create the Test Run anyway?`
+      );
+      if (!proceed) {
+        setManagingTestSet(testSet);
+        return;
+      }
+    }
+
+    const res = onCreateTestRun(testSet);
+    if (res) {
+      setCreatedRunToast({
+        runName: res.newTestRun.name,
+        trackerName: res.testRunTracker.name,
+        runObjId: res.newRunObj.id,
+        runId: res.newTestRun.id,
+        testRunTracker: res.testRunTracker
+      });
+    }
+  };
 
   // Filter items in Left Panel and Middle Panel
   let filteredObjects = objects;
@@ -454,6 +516,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
         onDeleteTestStep={onDeleteTestStep}
         onAddRelationship={onAddRelationship}
         onDeleteRelationship={onDeleteRelationship}
+        onCreateTestRun={handleTriggerCreateTestRun}
         onDone={() => setEditingObject(null)}
       />
     );
@@ -1354,51 +1417,231 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                           </div>
                         )}
 
-                        {/* If Test Set tracker: Included Test Cases */}
+                        {/* If Test Set tracker: Grouped Test Cases for Verification */}
                         {isTestSetTracker && (
                           <div style={{
                             backgroundColor: 'var(--bg-card)',
                             border: '1px solid var(--border-color)',
                             borderRadius: '8px',
-                            padding: '14px'
+                            padding: '16px'
                           }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
-                              <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                                Included Test Cases ({incCases.length})
-                              </span>
-                              <button
-                                onClick={() => setEditingObject(obj)}
-                                style={{
-                                  fontSize: '0.72rem',
-                                  color: 'var(--accent-cyan)',
-                                  background: 'none',
-                                  border: 'none',
-                                  cursor: 'pointer',
-                                  fontWeight: 600
-                                }}
-                              >
-                                Manage Test Cases ↗
-                              </button>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                              {incCases.length === 0 ? (
-                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontStyle: 'italic' }}>No test cases included in this set yet.</div>
-                              ) : (
-                                incCases.map(item => (
-                                  <div key={item.relId} style={{
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                              <div>
+                                <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                  Included Test Cases ({incCases.length})
+                                </span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '8px' }}>
+                                  • Group of test cases to verify
+                                </span>
+                              </div>
+
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => setManagingTestSet(obj)}
+                                  style={{
                                     display: 'flex',
-                                    justifyContent: 'space-between',
                                     alignItems: 'center',
-                                    backgroundColor: 'var(--bg-dark)',
-                                    padding: '6px 10px',
-                                    borderRadius: '4px',
-                                    fontSize: '0.8rem'
-                                  }}>
-                                    <span><span className="mono" style={{ color: 'var(--accent-cyan)' }}>[{item.tc?.object_key}]</span> {item.tc?.title}</span>
+                                    gap: '5px',
+                                    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                                    border: '1px solid rgba(56, 189, 248, 0.35)',
+                                    color: 'var(--accent-cyan)',
+                                    padding: '5px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title="Add or remove test cases in this test set"
+                                >
+                                  <Plus size={13} />
+                                  <span>Add Test Cases</span>
+                                </button>
+
+                                {onCreateTestRun && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleTriggerCreateTestRun(obj)}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '6px',
+                                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                                      color: 'var(--accent-emerald)',
+                                      padding: '5px 12px',
+                                      borderRadius: '6px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title={`Create Test Run for ${obj.folder_name || 'this test set'} in the single Test Runs tracker`}
+                                  >
+                                    <Play size={13} />
+                                    <span>Create Test Run</span>
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                              {incCases.length === 0 ? (
+                                <div style={{
+                                  fontSize: '0.82rem',
+                                  color: 'var(--text-muted)',
+                                  padding: '16px',
+                                  textAlign: 'center',
+                                  backgroundColor: 'var(--bg-dark)',
+                                  borderRadius: '6px',
+                                  border: '1px dashed var(--border-color)'
+                                }}>
+                                  <div>No test cases added to this test set yet.</div>
+                                  <div style={{ fontSize: '0.75rem', marginTop: '4px', opacity: 0.8 }}>
+                                    Group test cases together to execute a structured test run.
                                   </div>
-                                ))
+                                  <button
+                                    type="button"
+                                    onClick={() => setManagingTestSet(obj)}
+                                    style={{
+                                      marginTop: '10px',
+                                      backgroundColor: 'var(--accent-cyan)',
+                                      color: '#000',
+                                      border: 'none',
+                                      borderRadius: '5px',
+                                      padding: '6px 14px',
+                                      fontSize: '0.78rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    + Add Test Cases to Group
+                                  </button>
+                                </div>
+                              ) : (
+                                incCases.map(item => {
+                                  const stepCount = testSteps.filter(s => s.test_case_id === item.tc?.id).length;
+                                  return (
+                                    <div
+                                      key={item.relId}
+                                      style={{
+                                        display: 'flex',
+                                        justifyContent: 'space-between',
+                                        alignItems: 'center',
+                                        backgroundColor: 'var(--bg-dark)',
+                                        border: '1px solid var(--border-color)',
+                                        padding: '8px 12px',
+                                        borderRadius: '6px',
+                                        fontSize: '0.82rem'
+                                      }}
+                                    >
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden' }}>
+                                        <span className="mono" style={{ color: 'var(--accent-cyan)', fontWeight: 800, flexShrink: 0 }}>
+                                          [{item.tc?.object_key}]
+                                        </span>
+                                        <span style={{ color: 'var(--text-main)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {item.tc?.title}
+                                        </span>
+                                        <span style={{
+                                          fontSize: '0.68rem',
+                                          color: 'var(--text-muted)',
+                                          backgroundColor: 'rgba(255, 255, 255, 0.05)',
+                                          padding: '2px 6px',
+                                          borderRadius: '4px',
+                                          flexShrink: 0
+                                        }}>
+                                          {stepCount} {stepCount === 1 ? 'Step' : 'Steps'}
+                                        </span>
+                                        {item.tc?.status && (
+                                          <span className={`badge badge-${item.tc.status.toLowerCase().replace(/_/g, '-')}`} style={{ fontSize: '0.65rem', flexShrink: 0 }}>
+                                            {item.tc.status}
+                                          </span>
+                                        )}
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          onDeleteRelationship(item.relId);
+                                        }}
+                                        title="Remove test case from this test set"
+                                        style={{
+                                          backgroundColor: 'transparent',
+                                          border: 'none',
+                                          color: 'var(--text-muted)',
+                                          cursor: 'pointer',
+                                          padding: '4px',
+                                          borderRadius: '4px',
+                                          display: 'flex',
+                                          alignItems: 'center'
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.color = 'var(--accent-rose)'}
+                                        onMouseLeave={(e) => e.currentTarget.style.color = 'var(--text-muted)'}
+                                      >
+                                        <Trash2 size={14} />
+                                      </button>
+                                    </div>
+                                  );
+                                })
                               )}
                             </div>
+                          </div>
+                        )}
+
+                        {/* If Test Run tracker: Execution Test Run Summary */}
+                        {isTestRunTracker && (
+                          <div style={{
+                            backgroundColor: 'rgba(16, 185, 129, 0.04)',
+                            border: '1px solid rgba(16, 185, 129, 0.35)',
+                            borderRadius: '8px',
+                            padding: '16px'
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <Play size={16} color="var(--accent-emerald)" />
+                                <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
+                                  Execution Test Run
+                                </span>
+                                <span className={`badge badge-${(obj.status || 'NOT_RUN').toLowerCase().replace(/_/g, '-')}`}>
+                                  {obj.status || 'NOT_RUN'}
+                                </span>
+                              </div>
+
+                              {onNavigateView && (
+                                <button
+                                  type="button"
+                                  onClick={() => onNavigateView('TEST_EXECUTION')}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: 'var(--primary)',
+                                    color: '#fff',
+                                    border: 'none',
+                                    padding: '6px 14px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.8rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  <Play size={12} />
+                                  <span>Open in Test Execution Console</span>
+                                </button>
+                              )}
+                            </div>
+
+                            {(() => {
+                              const execRel = relationships.find(r => r.source_id === obj.id && r.relationship_type === 'EXECUTED_FROM');
+                              const origSet = execRel ? allObjects.find(o => o.id === execRel.target_id) : null;
+                              return origSet ? (
+                                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                                  Originating Test Set: <strong className="mono" style={{ color: 'var(--accent-cyan)' }}>[{origSet.object_key}]</strong> {origSet.title}
+                                </div>
+                              ) : null;
+                            })()}
                           </div>
                         )}
 
@@ -1523,6 +1766,112 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   {activeObject.title}
                 </div>
               </div>
+
+              {/* Quick Actions for Test Sets */}
+              {isTestSetTracker && (
+                <div style={{
+                  backgroundColor: 'var(--bg-dark)',
+                  border: '1px solid var(--border-color)',
+                  padding: '12px 14px',
+                  borderRadius: '8px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '10px'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                      Test Set Verification Group
+                    </span>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontWeight: 700 }}>
+                      {relationships.filter(r => r.target_id === activeObject.id && r.relationship_type === 'INCLUDED_IN').length} Cases
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+                    <button
+                      type="button"
+                      onClick={() => setManagingTestSet(activeObject)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '5px',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                        border: '1px solid rgba(56, 189, 248, 0.35)',
+                        color: 'var(--accent-cyan)',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Plus size={12} />
+                      <span>Add Cases</span>
+                    </button>
+
+                    {onCreateTestRun && (
+                      <button
+                        type="button"
+                        onClick={() => handleTriggerCreateTestRun(activeObject)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '5px',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                          border: '1px solid rgba(16, 185, 129, 0.4)',
+                          color: 'var(--accent-emerald)',
+                          fontSize: '0.75rem',
+                          fontWeight: 700,
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Play size={12} />
+                        <span>Run Set</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Quick Action for Test Runs */}
+              {isTestRunTracker && onNavigateView && (
+                <div style={{
+                  backgroundColor: 'rgba(16, 185, 129, 0.05)',
+                  border: '1px solid rgba(16, 185, 129, 0.35)',
+                  padding: '12px 14px',
+                  borderRadius: '8px'
+                }}>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
+                    Execution Test Run ready for step-by-step verification.
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onNavigateView('TEST_EXECUTION')}
+                    style={{
+                      width: '100%',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                      padding: '8px 12px',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--primary)',
+                      color: '#fff',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      border: 'none',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Play size={13} />
+                    <span>Open in Execution Console</span>
+                  </button>
+                </div>
+              )}
 
               {/* Section 1: Traceability & Relationships */}
               <div>
@@ -1982,6 +2331,438 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 5. Group Test Cases into Test Set Modal */}
+      {managingTestSet && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1100,
+          backdropFilter: 'blur(4px)'
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '14px',
+            width: '780px',
+            maxWidth: '92vw',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
+            boxShadow: '0 20px 50px rgba(0,0,0,0.6)'
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid var(--border-color)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              backgroundColor: 'var(--bg-sidebar)'
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span className="mono" style={{
+                    fontSize: '0.85rem',
+                    fontWeight: 800,
+                    color: 'var(--accent-cyan)',
+                    backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                    padding: '2px 8px',
+                    borderRadius: '4px'
+                  }}>
+                    [{managingTestSet.object_key}]
+                  </span>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+                    Group Test Cases into Test Set
+                  </h3>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '4px 0 0 0' }}>
+                  Select test cases across the project to group into <strong>{managingTestSet.title}</strong>
+                </p>
+              </div>
+
+              <button
+                onClick={() => setManagingTestSet(null)}
+                style={{
+                  backgroundColor: 'transparent',
+                  border: 'none',
+                  color: 'var(--text-muted)',
+                  cursor: 'pointer',
+                  padding: '6px',
+                  borderRadius: '6px'
+                }}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Filter Bar */}
+            <div style={{
+              padding: '14px 24px',
+              borderBottom: '1px solid var(--border-color)',
+              backgroundColor: 'var(--bg-dark)',
+              display: 'flex',
+              gap: '12px',
+              alignItems: 'center'
+            }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={15} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--text-muted)' }} />
+                <input
+                  type="text"
+                  placeholder="Search test cases by key, title, folder..."
+                  value={testCaseSearch}
+                  onChange={(e) => setTestCaseSearch(e.target.value)}
+                  style={{ width: '100%', paddingLeft: '36px', fontSize: '0.85rem', height: '36px' }}
+                />
+              </div>
+            </div>
+
+            {/* Test Cases List */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 24px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {(() => {
+                const currentSetRels = relationships.filter(r => r.target_id === managingTestSet.id && r.relationship_type === 'INCLUDED_IN');
+                const candidateTestCases = allObjects.filter(o =>
+                  o.id !== managingTestSet.id &&
+                  (
+                    o.type === 'TEST_CASE' ||
+                    o.object_key.startsWith('SYS-TST') ||
+                    o.object_key.includes('-TST') ||
+                    o.object_key.includes('-TC') ||
+                    o.tracker_name.toLowerCase().includes('test case') ||
+                    testSteps.some(s => s.test_case_id === o.id)
+                  )
+                ).filter(o => {
+                  if (!testCaseSearch.trim()) return true;
+                  const s = testCaseSearch.toLowerCase();
+                  return o.object_key.toLowerCase().includes(s) ||
+                         o.title.toLowerCase().includes(s) ||
+                         (o.folder_name && o.folder_name.toLowerCase().includes(s)) ||
+                         (o.tracker_name && o.tracker_name.toLowerCase().includes(s));
+                });
+
+                if (candidateTestCases.length === 0) {
+                  return (
+                    <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)' }}>
+                      No test cases match your search query.
+                    </div>
+                  );
+                }
+
+                return candidateTestCases.map(tc => {
+                  const existingRel = currentSetRels.find(r => r.source_id === tc.id);
+                  const isIncluded = Boolean(existingRel);
+                  const stepCount = testSteps.filter(s => s.test_case_id === tc.id).length;
+
+                  return (
+                    <div
+                      key={tc.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        backgroundColor: isIncluded ? 'rgba(16, 185, 129, 0.08)' : 'var(--bg-dark)',
+                        border: isIncluded ? '1px solid rgba(16, 185, 129, 0.35)' : '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1, paddingRight: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span className="mono" style={{
+                            fontSize: '0.8rem',
+                            fontWeight: 800,
+                            color: 'var(--accent-cyan)'
+                          }}>
+                            [{tc.object_key}]
+                          </span>
+                          <span style={{ fontSize: '0.9rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                            {tc.title}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          {tc.folder_name && (
+                            <span style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                              <Folder size={11} /> {tc.folder_name}
+                            </span>
+                          )}
+                          <span>• Tracker: {cleanTrackerName(tc.tracker_name)}</span>
+                          <span>• {stepCount} Procedure {stepCount === 1 ? 'Step' : 'Steps'}</span>
+                          {tc.status && (
+                            <span className={`badge badge-${tc.status.toLowerCase().replace(/_/g, '-')}`} style={{ fontSize: '0.62rem' }}>
+                              {tc.status}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        {isIncluded ? (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                              fontSize: '0.75rem',
+                              fontWeight: 700,
+                              color: 'var(--accent-emerald)',
+                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                              border: '1px solid rgba(16, 185, 129, 0.4)',
+                              padding: '4px 10px',
+                              borderRadius: '6px'
+                            }}>
+                              <CheckCircle2 size={13} />
+                              <span>Included</span>
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (existingRel) onDeleteRelationship(existingRel.id);
+                              }}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                backgroundColor: 'rgba(239, 68, 68, 0.12)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                color: 'var(--accent-rose)',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                              title="Remove from test set"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              onAddRelationship(tc.id, managingTestSet.id, 'INCLUDED_IN');
+                            }}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '5px',
+                              padding: '6px 14px',
+                              borderRadius: '6px',
+                              backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                              border: '1px solid rgba(56, 189, 248, 0.4)',
+                              color: 'var(--accent-cyan)',
+                              fontSize: '0.78rem',
+                              fontWeight: 700,
+                              cursor: 'pointer'
+                            }}
+                          >
+                            <Plus size={13} />
+                            <span>Add to Set</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '16px 24px',
+              borderTop: '1px solid var(--border-color)',
+              backgroundColor: 'var(--bg-sidebar)',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              {(() => {
+                const count = relationships.filter(r => r.target_id === managingTestSet.id && r.relationship_type === 'INCLUDED_IN').length;
+                return (
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                    Currently grouped: <strong style={{ color: 'var(--accent-cyan)' }}>{count} Test {count === 1 ? 'Case' : 'Cases'}</strong> in this Test Set
+                  </div>
+                );
+              })()}
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                {onCreateTestRun && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const setObj = managingTestSet;
+                      setManagingTestSet(null);
+                      handleTriggerCreateTestRun(setObj);
+                    }}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px',
+                      padding: '8px 16px',
+                      borderRadius: '6px',
+                      backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                      border: '1px solid rgba(16, 185, 129, 0.4)',
+                      color: 'var(--accent-emerald)',
+                      fontWeight: 700,
+                      fontSize: '0.82rem',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <Play size={13} />
+                    <span>Create Test Run from this Set</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setManagingTestSet(null)}
+                  style={{
+                    padding: '8px 20px',
+                    borderRadius: '6px',
+                    backgroundColor: 'var(--primary)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.85rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6. Test Run Created Success Toast / Modal */}
+      {createdRunToast && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.75)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1200,
+          backdropFilter: 'blur(3px)'
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid rgba(16, 185, 129, 0.4)',
+            borderRadius: '12px',
+            width: '500px',
+            padding: '26px',
+            boxShadow: '0 15px 40px rgba(0,0,0,0.6), 0 0 20px rgba(16, 185, 129, 0.15)'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+              <div style={{
+                backgroundColor: 'rgba(16, 185, 129, 0.2)',
+                color: 'var(--accent-emerald)',
+                borderRadius: '50%',
+                padding: '6px',
+                display: 'flex'
+              }}>
+                <CheckCircle2 size={24} />
+              </div>
+              <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>
+                Test Run Created!
+              </h3>
+            </div>
+
+            <div style={{ backgroundColor: 'var(--bg-dark)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-color)', marginBottom: '16px' }}>
+              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 700, textTransform: 'uppercase' }}>
+                Test Run Name
+              </div>
+              <div style={{ fontSize: '1.05rem', fontWeight: 800, color: 'var(--accent-cyan)', marginTop: '2px' }}>
+                {createdRunToast.runName}
+              </div>
+              <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '8px' }}>
+                Created in single tracker: <strong style={{ color: 'var(--accent-emerald)' }}>{createdRunToast.trackerName}</strong>
+              </div>
+            </div>
+
+            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '20px', lineHeight: '1.4' }}>
+              This test run is organized in the central <strong>{createdRunToast.trackerName}</strong> tracker and populated with all test cases ready for execution.
+            </p>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+              <button
+                type="button"
+                onClick={() => setCreatedRunToast(null)}
+                style={{
+                  padding: '8px 16px',
+                  borderRadius: '6px',
+                  backgroundColor: 'var(--bg-dark)',
+                  color: 'var(--text-main)',
+                  border: '1px solid var(--border-color)',
+                  cursor: 'pointer',
+                  fontSize: '0.82rem'
+                }}
+              >
+                Close
+              </button>
+
+              {onNavigateTracker && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const tr = createdRunToast.testRunTracker;
+                    const objId = createdRunToast.runObjId;
+                    setCreatedRunToast(null);
+                    onNavigateTracker(tr, objId);
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 16px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(56, 189, 248, 0.15)',
+                    border: '1px solid rgba(56, 189, 248, 0.4)',
+                    color: 'var(--accent-cyan)',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <ExternalLink size={13} />
+                  <span>Go to Test Runs Tracker</span>
+                </button>
+              )}
+
+              {onNavigateView && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatedRunToast(null);
+                    onNavigateView('TEST_EXECUTION');
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    padding: '8px 18px',
+                    borderRadius: '6px',
+                    backgroundColor: 'var(--primary)',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    border: 'none',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Play size={13} />
+                  <span>Open in Execution Console</span>
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )}

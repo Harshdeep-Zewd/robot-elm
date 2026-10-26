@@ -3,7 +3,7 @@ import {
   ArrowLeft, Save, X, Plus, ListOrdered, CheckCircle2, ShieldAlert,
   Clock, User, FileText, Link as LinkIcon, Paperclip, Bold, Italic,
   Underline, List, Table, Image as ImageIcon, Code, Check, ChevronDown,
-  Layers, ExternalLink, AlertCircle
+  Layers, ExternalLink, AlertCircle, Play
 } from 'lucide-react';
 import {
   EngineeringObject, Tracker, Folder as FolderType, Relationship,
@@ -26,6 +26,7 @@ interface RequirementEditDashboardProps {
   onDeleteTestStep?: (id: number) => void;
   onAddRelationship?: (source_id: number, target_id: number, type: string) => void;
   onDeleteRelationship?: (id: number) => void;
+  onCreateTestRun?: (testSet: EngineeringObject) => void;
   onDone: () => void;
 }
 
@@ -42,6 +43,7 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
   onDeleteTestStep,
   onAddRelationship,
   onDeleteRelationship,
+  onCreateTestRun,
   onDone
 }) => {
   // View mode tab: [All] | [Required] | [Editable]
@@ -133,7 +135,29 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
   const [savedSuccess, setSavedSuccess] = useState(false);
 
   const isTestCaseTracker = tracker.enable_test_steps ?? (tracker.type === 'TEST_CASE' || tracker.key === 'SYS-TST' || tracker.prefix.includes('TST-'));
-  const isTestSetTracker = tracker.type === 'TEST_SET' || tracker.key === 'TST-SET' || tracker.prefix.includes('SET-');
+  const isTestSetTracker =
+    tracker.type === 'TEST_SET' ||
+    tracker.key === 'TST-SET' ||
+    tracker.key.includes('SET') ||
+    tracker.prefix.includes('SET-') ||
+    tracker.name.toLowerCase().includes('test set') ||
+    cleanTrackerName(tracker.name).toLowerCase().includes('test set');
+
+  const incRels = relationships.filter(r => r.target_id === object.id && r.relationship_type === 'INCLUDED_IN');
+  const incCases = incRels.map(r => ({ relId: r.id, tc: allObjects.find(o => o.id === r.source_id) })).filter(i => i.tc);
+  const availTestCases = allObjects.filter(o =>
+    o.id !== object.id &&
+    (
+      o.type === 'TEST_CASE' ||
+      o.object_key.startsWith('SYS-TST') ||
+      o.object_key.includes('-TST') ||
+      o.object_key.includes('-TC') ||
+      o.tracker_name.toLowerCase().includes('test case') ||
+      testSteps.some(s => s.test_case_id === o.id)
+    ) &&
+    !incRels.some(r => r.source_id === o.id)
+  );
+  const [selectedTestCaseToAdd, setSelectedTestCaseToAdd] = useState<number | null>(null);
 
   const objSteps = isHistorical && historicalSnapshot?.test_steps
     ? historicalSnapshot.test_steps
@@ -564,6 +588,30 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
               </button>
             ))}
           </div>
+
+          {isTestSetTracker && onCreateTestRun && !isHistorical && (
+            <button
+              type="button"
+              onClick={() => onCreateTestRun(object)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                border: '1px solid rgba(16, 185, 129, 0.4)',
+                color: 'var(--accent-emerald)',
+                padding: '7px 14px',
+                borderRadius: '6px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer'
+              }}
+              title={`Create Test Run for ${object.folder_name || 'this test set'} in the Test Runs tracker`}
+            >
+              <Play size={13} />
+              <span>Create Test Run</span>
+            </button>
+          )}
 
           <button
             onClick={onDone}
@@ -1078,6 +1126,135 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
                   + Add Step
                 </button>
               </form>
+            )}
+          </div>
+        )}
+
+        {/* ═══ 4b. 📦 INCLUDED TEST CASES (TEST SET GROUP) ═══ */}
+        {isTestSetTracker && (
+          <div style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '18px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <CheckCircle2 size={16} color="var(--accent-cyan)" />
+                <h4 style={{ fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>
+                  Included Test Cases (Grouped for Verification) ({incCases.length})
+                </h4>
+              </div>
+
+              {onCreateTestRun && (
+                <button
+                  type="button"
+                  onClick={() => onCreateTestRun(object)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                    color: 'var(--accent-emerald)',
+                    padding: '6px 14px',
+                    borderRadius: '6px',
+                    fontSize: '0.8rem',
+                    fontWeight: 700,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Play size={13} />
+                  <span>Create Test Run from this Set</span>
+                </button>
+              )}
+            </div>
+
+            {/* List of included test cases */}
+            {incCases.length > 0 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '14px' }}>
+                {incCases.map(item => {
+                  const stepCount = testSteps.filter(s => s.test_case_id === item.tc?.id).length;
+                  return (
+                    <div key={item.relId} style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      backgroundColor: 'var(--bg-dark)',
+                      border: '1px solid var(--border-color)',
+                      padding: '10px 14px',
+                      borderRadius: '6px',
+                      fontSize: '0.85rem'
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <span className="mono" style={{ fontWeight: 800, color: 'var(--accent-cyan)' }}>
+                          [{item.tc?.object_key}]
+                        </span>
+                        <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                          {item.tc?.title}
+                        </span>
+                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                          • {stepCount} Steps
+                        </span>
+                      </div>
+
+                      {!isHistorical && onDeleteRelationship && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteRelationship(item.relId)}
+                          style={{ background: 'transparent', border: 'none', color: 'var(--accent-rose)', cursor: 'pointer', padding: '4px' }}
+                          title="Remove from test set"
+                        >
+                          <X size={15} />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div style={{ padding: '16px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.82rem', backgroundColor: 'var(--bg-dark)', borderRadius: '6px', marginBottom: '14px' }}>
+                No test cases included in this test set yet. Group test cases together to execute a test run.
+              </div>
+            )}
+
+            {/* Add Test Case Selector */}
+            {!isHistorical && onAddRelationship && (
+              <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                <select
+                  value={selectedTestCaseToAdd || ''}
+                  onChange={(e) => setSelectedTestCaseToAdd(Number(e.target.value) || null)}
+                  style={{ flex: 1, fontSize: '0.82rem', padding: '8px 10px' }}
+                >
+                  <option value="">Select a test case to add to this test set...</option>
+                  {availTestCases.map(tc => (
+                    <option key={tc.id} value={tc.id}>
+                      [{tc.object_key}] {tc.title} ({cleanTrackerName(tc.tracker_name)})
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={!selectedTestCaseToAdd}
+                  onClick={() => {
+                    if (selectedTestCaseToAdd) {
+                      onAddRelationship(selectedTestCaseToAdd, object.id, 'INCLUDED_IN');
+                      setSelectedTestCaseToAdd(null);
+                    }
+                  }}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '8px 16px',
+                    backgroundColor: selectedTestCaseToAdd ? 'var(--accent-cyan)' : 'var(--bg-dark)',
+                    color: selectedTestCaseToAdd ? '#000' : 'var(--text-muted)',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontWeight: 700,
+                    fontSize: '0.82rem',
+                    cursor: selectedTestCaseToAdd ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  <Plus size={14} />
+                  <span>Add to Group</span>
+                </button>
+              </div>
             )}
           </div>
         )}
