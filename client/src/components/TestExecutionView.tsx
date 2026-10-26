@@ -523,8 +523,9 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
                       </div>
                     ))}
                   </div>
-                );
-              })
+                </div>
+              );
+            })
             ) : (
               <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px', backgroundColor: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 No test cases registered for this test run.
