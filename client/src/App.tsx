@@ -1260,10 +1260,11 @@ export const App: React.FC = () => {
   };
 
   const handleCreateTestRunFromSet = (testSet: EngineeringObject) => {
-    // 1. Resolve folder name of test set
+    // 1. Resolve folder name of test set and name format based on test set title
     const folder = allFolders.find(f => f.id === testSet.folder_id);
     const folderName = testSet.folder_name || folder?.name || 'General';
-    const runName = `Test Run for ${folderName}`;
+    const testSetName = testSet.title?.trim() || testSet.object_key;
+    const runName = `Test Run for ${testSetName}`;
 
     // 2. Find single test run tracker for current project
     let testRunTracker = currentTrackers.find(t =>

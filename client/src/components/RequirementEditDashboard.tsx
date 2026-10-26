@@ -606,7 +606,7 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
                 fontWeight: 700,
                 cursor: 'pointer'
               }}
-              title={`Create Test Run for ${object.folder_name || 'this test set'} in the Test Runs tracker`}
+              title={`Create Test Run for ${object.title || object.object_key} in the Test Runs tracker`}
             >
               <Play size={13} />
               <span>Create Test Run</span>

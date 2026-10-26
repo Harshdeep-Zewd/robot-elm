@@ -1477,7 +1477,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                       cursor: 'pointer',
                                       transition: 'all 0.15s ease'
                                     }}
-                                    title={`Create Test Run for ${obj.folder_name || 'this test set'} in the single Test Runs tracker`}
+                                    title={`Create Test Run for ${obj.title || obj.object_key} in the single Test Runs tracker`}
                                   >
                                     <Play size={13} />
                                     <span>Create Test Run</span>
