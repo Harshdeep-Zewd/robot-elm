@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Play, CheckCircle2, XCircle, AlertOctagon, HelpCircle, Plus, Activity, Layers, User, Settings, Check, X } from 'lucide-react';
 import { TestRun, Project, Tracker, EngineeringObject, TestStep, Relationship, User as UserType } from '../types/elm';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface TestExecutionViewProps {
   currentUser?: UserType | null;
@@ -400,19 +401,30 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
 
             {/* Test Case Execution Cards */}
             {activeRunDetail.caseResults?.length > 0 ? (
-              activeRunDetail.caseResults.map((cr: any) => (
-                <div key={cr.id} style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-                    <div>
-                      <span className="mono" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '3px 8px', borderRadius: '4px', marginRight: '10px' }}>
-                        {cr.case_key}
+              activeRunDetail.caseResults.map((cr: any) => {
+                const caseTabHandlers = createNewTabHandlers({
+                  view: 'TRACKER',
+                  objectKey: cr.case_key,
+                  label: `[${cr.case_key}] ${cr.case_title}`
+                });
+
+                return (
+                  <div key={cr.id} style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
+                      <div
+                        {...caseTabHandlers}
+                        title={`[${cr.case_key}] ${cr.case_title}\n💡 [Ctrl + Right-Click] Open in new tab`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <span className="mono" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '3px 8px', borderRadius: '4px', marginRight: '10px' }}>
+                          {cr.case_key}
+                        </span>
+                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'inline', color: 'var(--text-main)' }}>{cr.case_title}</h3>
+                      </div>
+                      <span className={`badge badge-${(cr.status || 'NOT_RUN').toLowerCase().replace(/_/g, '-')}`}>
+                        {cr.status || 'NOT_RUN'}
                       </span>
-                      <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'inline', color: 'var(--text-main)' }}>{cr.case_title}</h3>
                     </div>
-                    <span className={`badge badge-${(cr.status || 'NOT_RUN').toLowerCase().replace(/_/g, '-')}`}>
-                      {cr.status || 'NOT_RUN'}
-                    </span>
-                  </div>
 
                   {/* Ordered Step List */}
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -511,8 +523,8 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
                       </div>
                     ))}
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px', backgroundColor: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 No test cases registered for this test run.

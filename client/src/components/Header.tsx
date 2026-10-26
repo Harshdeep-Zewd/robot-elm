@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bot, Search, Plus, FolderPlus, ChevronDown, Check, User, ShieldCheck, LogOut, Sparkles, Pencil, Trash2, ArrowLeft } from 'lucide-react';
 import { Project, User as UserType } from '../types/elm';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface HeaderProps {
   project: Project | null;
@@ -136,7 +137,7 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Back to All Projects Portal Button */}
         {onBackToProjects && (
           <button
-            onClick={onBackToProjects}
+            {...createNewTabHandlers({ view: 'PORTAL', label: 'All Projects Portal' }, onBackToProjects)}
             style={{
               display: 'flex',
               alignItems: 'center',
@@ -151,7 +152,7 @@ export const Header: React.FC<HeaderProps> = ({
               cursor: 'pointer',
               transition: 'all 0.15s ease'
             }}
-            title="Return to Projects Page"
+            title="Return to Projects Page&#10;💡 [Ctrl + Right-Click] Open in new tab"
           >
             <ArrowLeft size={14} />
             <span>← All Projects</span>
@@ -258,27 +259,38 @@ export const Header: React.FC<HeaderProps> = ({
                 )}
               </div>
 
-              {projects.map((p) => (
-                <div
-                  key={p.id}
-                  onClick={() => {
+              {projects.map((p) => {
+                const projTabHandlers = createNewTabHandlers(
+                  {
+                    projectKey: p.key.toLowerCase(),
+                    view: 'DASHBOARD',
+                    label: p.name
+                  },
+                  () => {
                     onSelectProject(p);
                     setShowDropdown(false);
-                  }}
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    width: '100%',
-                    padding: '8px 10px',
-                    borderRadius: '6px',
-                    backgroundColor: project?.id === p.id ? 'var(--bg-hover)' : 'transparent',
-                    color: project?.id === p.id ? 'var(--accent-cyan)' : 'var(--text-main)',
-                    fontSize: '0.85rem',
-                    cursor: 'pointer',
-                    marginBottom: '2px'
-                  }}
-                >
+                  }
+                );
+
+                return (
+                  <div
+                    key={p.id}
+                    {...projTabHandlers}
+                    title={`${p.name} (${p.key})\n💡 [Ctrl + Right-Click] Open in new tab`}
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      width: '100%',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: project?.id === p.id ? 'var(--bg-hover)' : 'transparent',
+                      color: project?.id === p.id ? 'var(--accent-cyan)' : 'var(--text-main)',
+                      fontSize: '0.85rem',
+                      cursor: 'pointer',
+                      marginBottom: '2px'
+                    }}
+                  >
                   <div style={{ flex: 1, overflow: 'hidden', paddingRight: '8px' }}>
                     <div style={{ fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                       {p.name} <span className="mono" style={{ fontSize: '0.7rem', opacity: 0.8 }}>({p.key})</span>
@@ -325,8 +337,8 @@ export const Header: React.FC<HeaderProps> = ({
                       </>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

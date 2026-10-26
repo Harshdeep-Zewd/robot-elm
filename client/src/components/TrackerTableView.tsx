@@ -13,6 +13,7 @@ import { cleanTrackerName } from '../data/canonicalTrackers';
 import { RequirementEditDashboard } from './RequirementEditDashboard';
 import { EnterpriseCreateModal } from './EnterpriseCreateModal';
 import { CustomColumnCard } from './CustomColumnCard';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface TrackerTableViewProps {
   tracker: Tracker;
@@ -81,8 +82,31 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   onBackToDashboard
 }) => {
   // Navigation & Filter state
-  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(null);
-  const [selectedObjectId, setSelectedObjectId] = useState<number | null>(null);
+  const [selectedFolderId, setSelectedFolderId] = useState<number | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const objParam = params.get('object');
+      if (objParam) {
+        const found = objects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
+        if (found && found.folder_id) return found.folder_id;
+      }
+      const fParam = params.get('folder');
+      if (fParam) return Number(fParam);
+    } catch (e) {}
+    return null;
+  });
+
+  const [selectedObjectId, setSelectedObjectId] = useState<number | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const objParam = params.get('object');
+      if (objParam) {
+        const found = objects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
+        if (found) return found.id;
+      }
+    } catch (e) {}
+    return objects.length > 0 ? objects[0].id : null;
+  });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
@@ -157,6 +181,22 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
       setSelectedObjectId(null);
     }
   }, [filteredObjects, tracker.id]);
+
+  // Deep-link direct scroll and expansion on mount
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const objParam = params.get('object');
+      if (objParam) {
+        const found = objects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
+        if (found) {
+          setTimeout(() => {
+            scrollToRequirementCard(found, found.folder_id);
+          }, 150);
+        }
+      }
+    } catch (e) {}
+  }, [tracker.id]);
 
   // Keep folder expansions updated if new folders are added
   useEffect(() => {
@@ -438,7 +478,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
           {/* Back Button to Dashboard (Point 1) */}
           {onBackToDashboard && (
             <button
-              onClick={onBackToDashboard}
+              {...createNewTabHandlers({ view: 'DASHBOARD', label: 'Project Dashboard' }, onBackToDashboard)}
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -453,7 +493,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                 cursor: 'pointer',
                 transition: 'all 0.15s ease'
               }}
-              title="Return to Project Dashboard"
+              title="Return to Project Dashboard&#10;💡 [Ctrl + Right-Click] Open in new tab"
             >
               <ArrowLeft size={15} />
               <span>← Back to Dashboard</span>
@@ -648,10 +688,20 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                       })
                       .map(obj => {
                         const isSelected = selectedObjectId === obj.id;
+                        const objTabHandlers = createNewTabHandlers(
+                          {
+                            view: 'TRACKER',
+                            trackerId: tracker.id,
+                            objectId: obj.id,
+                            objectKey: obj.object_key,
+                            label: `[${obj.object_key}] ${obj.title}`
+                          },
+                          () => scrollToRequirementCard(obj, null)
+                        );
                         return (
                           <div
                             key={obj.id}
-                            onClick={() => scrollToRequirementCard(obj, null)}
+                            {...objTabHandlers}
                             style={{
                               padding: '6px 8px',
                               borderRadius: '4px',
@@ -666,7 +716,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               gap: '6px',
                               transition: 'all 0.15s ease'
                             }}
-                            title={`Click to view [${obj.object_key}] in middle panel`}
+                            title={`[${obj.object_key}] ${obj.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
                           >
                             <span className="mono" style={{ fontSize: '0.72rem', opacity: 0.85 }}>[{obj.object_key}]</span>
                             <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obj.title}</span>
@@ -746,10 +796,20 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                         ) : (
                           folderObjects.map(obj => {
                             const isSelected = selectedObjectId === obj.id;
+                            const objTabHandlers = createNewTabHandlers(
+                              {
+                                view: 'TRACKER',
+                                trackerId: tracker.id,
+                                objectId: obj.id,
+                                objectKey: obj.object_key,
+                                label: `[${obj.object_key}] ${obj.title}`
+                              },
+                              () => scrollToRequirementCard(obj, folder.id)
+                            );
                             return (
                               <div
                                 key={obj.id}
-                                onClick={() => scrollToRequirementCard(obj, folder.id)}
+                                {...objTabHandlers}
                                 style={{
                                   padding: '6px 8px',
                                   borderRadius: '4px',
@@ -764,7 +824,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                   gap: '6px',
                                   transition: 'all 0.15s ease'
                                 }}
-                                title={`Click to view [${obj.object_key}] in middle panel`}
+                                title={`[${obj.object_key}] ${obj.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
                               >
                                 <span className="mono" style={{ fontSize: '0.72rem', opacity: 0.85 }}>[{obj.object_key}]</span>
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obj.title}</span>
@@ -902,6 +962,17 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   );
                 };
 
+                const reqTabHandlers = createNewTabHandlers(
+                  {
+                    view: 'TRACKER',
+                    trackerId: tracker.id,
+                    objectId: obj.id,
+                    objectKey: obj.object_key,
+                    label: `[${obj.object_key}] ${obj.title}`
+                  },
+                  () => toggleRequirementDropdown(obj.id)
+                );
+
                 return (
                   <div
                     key={obj.id}
@@ -917,7 +988,8 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   >
                     {/* ═══ Header Bar (The card in the Green Box) - Click toggles Dropdown ═══ */}
                     <div
-                      onClick={() => toggleRequirementDropdown(obj.id)}
+                      {...reqTabHandlers}
+                      title={`[${obj.object_key}] ${obj.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
                       style={{
                         padding: '12px 18px',
                         backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.08)' : 'var(--bg-card)',

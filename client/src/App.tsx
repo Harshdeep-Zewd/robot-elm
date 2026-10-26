@@ -500,16 +500,16 @@ export const App: React.FC = () => {
       if (acc === 'demo') {
         return DEMO_USER;
       }
-      if (acc === 'zewd') {
-        return null;
-      }
-      const raw = sessionStorage.getItem('roboserv_auth_current_user');
+      // Check stored session across tabs
+      const raw = sessionStorage.getItem('roboserv_auth_current_user') || localStorage.getItem('roboserv_auth_current_user');
       if (raw) {
         const u = JSON.parse(raw);
-        if (u.username === 'zewd') {
-          u.password = 'zew_D003';
+        if (u && u.username) {
+          if (u.username === 'zewd') {
+            u.password = 'zew_D003';
+          }
+          return u;
         }
-        return u;
       }
     } catch (e) {}
     return null;
@@ -539,7 +539,7 @@ export const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<'PROJECTS_PORTAL' | 'WORKSPACE'>(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('project')) return 'WORKSPACE';
+      if (params.get('project') || params.get('tracker') || params.get('object') || params.get('view')) return 'WORKSPACE';
     } catch (e) {}
     return 'PROJECTS_PORTAL';
   });
@@ -558,6 +558,28 @@ export const App: React.FC = () => {
       if (projParam) {
         const found = loadedProjects.find(p => p.key.toLowerCase() === projParam.toLowerCase() || String(p.id) === projParam);
         if (found) return found.id;
+      }
+      const objParam = params.get('object');
+      if (objParam) {
+        const loadedObjects = getInitialData<EngineeringObject[]>('objects', INITIAL_OBJECTS);
+        const obj = loadedObjects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
+        if (obj) {
+          const loadedTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+          const trk = loadedTrackers.find(t => t.id === obj.tracker_id);
+          if (trk) {
+            const foundProj = loadedProjects.find(p => p.id === trk.project_id);
+            if (foundProj) return foundProj.id;
+          }
+        }
+      }
+      const trkParam = params.get('tracker');
+      if (trkParam) {
+        const loadedTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+        const trk = loadedTrackers.find(t => String(t.id) === trkParam || t.key.toLowerCase() === trkParam.toLowerCase());
+        if (trk) {
+          const foundProj = loadedProjects.find(p => p.id === trk.project_id);
+          if (foundProj) return foundProj.id;
+        }
       }
     } catch (e) {}
     const savedId = getInitialData<number | null>('active_project_id', null);
@@ -621,9 +643,30 @@ export const App: React.FC = () => {
   });
   
   const [selectedTrackerId, setSelectedTrackerId] = useState<number | null>(() => {
+    const loadedTrackers = isDemo ? initialDemoBundle.demoTrackers : getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const objParam = params.get('object');
+      if (objParam) {
+        const loadedObjects = isDemo ? initialDemoBundle.demoObjects : getInitialData<EngineeringObject[]>('objects', INITIAL_OBJECTS);
+        const foundObj = loadedObjects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
+        if (foundObj) {
+          return foundObj.tracker_id;
+        }
+      }
+      const trkParam = params.get('tracker');
+      if (trkParam) {
+        const foundTrk = loadedTrackers.find(t =>
+          String(t.id) === trkParam ||
+          t.key.toLowerCase() === trkParam.toLowerCase() ||
+          t.prefix.toLowerCase() === trkParam.toLowerCase() ||
+          cleanTrackerName(t.name).toLowerCase() === trkParam.toLowerCase()
+        );
+        if (foundTrk) return foundTrk.id;
+      }
+    } catch (e) {}
     if (isDemo) return initialDemoBundle.demoTrackers[0]?.id || null;
     const savedId = getInitialData<number | null>('selected_tracker_id', null);
-    const loadedTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
     if (savedId && loadedTrackers.some(t => t.id === savedId)) {
       return savedId;
     }
@@ -675,7 +718,19 @@ export const App: React.FC = () => {
     return getInitialData('test_run_details', INITIAL_TEST_RUN_DETAILS);
   });
   
-  const [activeView, setActiveView] = useState<ViewMode>('TRACKER');
+  const [activeView, setActiveView] = useState<ViewMode>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const v = params.get('view')?.toUpperCase();
+      if (v === 'DASHBOARD' || v === 'TRACKER' || v === 'TRACEABILITY' || v === 'TEST_EXECUTION' || v === 'IMPACT') {
+        return v as ViewMode;
+      }
+      if (params.get('tracker') || params.get('object')) {
+        return 'TRACKER';
+      }
+    } catch (e) {}
+    return 'DASHBOARD';
+  });
   const [searchQuery, setSearchQuery] = useState('');
   const [impactObjectId, setImpactObjectId] = useState<number | null>(null);
 
@@ -700,6 +755,38 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('popstate', handlePopState);
   }, [projects]);
 
+  // Cross-tab real-time state synchronization
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (!e.key) return;
+      if (e.key === 'roboserv_auth_current_user') {
+        if (!e.newValue) {
+          setCurrentUser(null);
+          setCurrentScreen('PROJECTS_PORTAL');
+        } else {
+          try {
+            setCurrentUser(JSON.parse(e.newValue));
+          } catch (err) {}
+        }
+      } else if (e.key === 'roboserv_elm_objects') {
+        try { if (e.newValue) setAllObjects(JSON.parse(e.newValue)); } catch (err) {}
+      } else if (e.key === 'roboserv_elm_folders') {
+        try { if (e.newValue) setAllFolders(JSON.parse(e.newValue)); } catch (err) {}
+      } else if (e.key === 'roboserv_elm_relationships') {
+        try { if (e.newValue) setRelationships(JSON.parse(e.newValue)); } catch (err) {}
+      } else if (e.key === 'roboserv_elm_trackers') {
+        try { if (e.newValue) setAllTrackers(JSON.parse(e.newValue)); } catch (err) {}
+      } else if (e.key === 'roboserv_elm_projects') {
+        try { if (e.newValue) setProjects(JSON.parse(e.newValue)); } catch (err) {}
+      } else if (e.key === 'roboserv_elm_test_runs') {
+        try { if (e.newValue) setTestRuns(JSON.parse(e.newValue)); } catch (err) {}
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   const handleLogout = () => {
     authService.logout();
     try {
@@ -708,6 +795,9 @@ export const App: React.FC = () => {
       const url = new URL(window.location.href);
       url.searchParams.delete('account');
       url.searchParams.delete('project');
+      url.searchParams.delete('view');
+      url.searchParams.delete('tracker');
+      url.searchParams.delete('object');
       window.history.replaceState({}, '', url.pathname);
     } catch (e) {}
     setCurrentUser(null);
@@ -716,6 +806,10 @@ export const App: React.FC = () => {
 
   const handleLoginSuccess = (user: User) => {
     setCurrentUser(user);
+    try {
+      sessionStorage.setItem('roboserv_auth_current_user', JSON.stringify(user));
+      localStorage.setItem('roboserv_auth_current_user', JSON.stringify(user));
+    } catch (e) {}
     if (user.username === 'demo') {
       const demoTrackers = buildDemoTrackers();
       const demoFolders = buildDemoFolders(demoTrackers);

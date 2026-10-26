@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Bot, Folder, Plus, ArrowRight, Layers, FileText, FlaskConical, Pencil, Trash2, Search, CheckCircle2, ShieldCheck, ExternalLink, LogOut } from 'lucide-react';
 import { Project, Tracker, EngineeringObject, TestRun, User } from '../types/elm';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface ProjectsPortalViewProps {
   projects: Project[];
@@ -305,11 +306,20 @@ export const ProjectsPortalView: React.FC<ProjectsPortalViewProps> = ({
             const pTrackerIds = pTrackers.map(t => t.id);
             const pObjects = allObjects.filter(o => pTrackerIds.includes(o.tracker_id));
             const pRuns = testRuns.filter(r => r.project_id === p.id);
+            const projTabHandlers = createNewTabHandlers(
+              {
+                projectKey: p.key.toLowerCase(),
+                view: 'DASHBOARD',
+                label: p.name
+              },
+              () => onSelectProject(p)
+            );
 
             return (
               <div
                 key={p.id}
-                onClick={() => onSelectProject(p)}
+                {...projTabHandlers}
+                title={`${p.name} ([${p.key}])\n💡 [Ctrl + Right-Click] Open in new tab`}
                 style={{
                   backgroundColor: 'var(--bg-card)',
                   border: '1px solid var(--border-color)',
@@ -434,7 +444,8 @@ export const ProjectsPortalView: React.FC<ProjectsPortalViewProps> = ({
 
                 {/* Launch Button */}
                 <button
-                  onClick={() => onSelectProject(p)}
+                  {...projTabHandlers}
+                  title="Open Project Dashboard&#10;💡 [Ctrl + Right-Click] Open in new tab"
                   style={{
                     display: 'flex',
                     alignItems: 'center',

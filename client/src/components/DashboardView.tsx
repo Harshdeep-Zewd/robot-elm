@@ -19,6 +19,7 @@ import {
 import { ViewMode } from './Sidebar';
 import { Project, Tracker, EngineeringObject, TestRun } from '../types/elm';
 import { cleanTrackerName, getTrackerCategory, CANONICAL_CATEGORIES, CanonicalCategory } from '../data/canonicalTrackers';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface DashboardViewProps {
   project: Project;
@@ -461,10 +462,22 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     const cleanName = cleanTrackerName(t.name);
                     const itemNumber = `${group.id}.${idx + 1}`;
 
+                    const cardTabHandlers = createNewTabHandlers(
+                      {
+                        projectKey: project.key.toLowerCase(),
+                        view: 'TRACKER',
+                        trackerId: t.id,
+                        trackerKey: t.key,
+                        label: cleanName
+                      },
+                      () => onNavigate('TRACKER', t)
+                    );
+
                     return (
                       <div
                         key={t.id}
-                        onClick={() => onNavigate('TRACKER', t)}
+                        {...cardTabHandlers}
+                        title={`${cleanName} (${t.key})\n💡 [Ctrl + Right-Click] Open in new tab`}
                         style={{
                           backgroundColor: 'var(--bg-dark)',
                           border: '1px solid var(--border-color)',

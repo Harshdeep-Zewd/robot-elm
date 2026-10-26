@@ -24,6 +24,7 @@ import {
 import { Tracker, User } from '../types/elm';
 import { authService } from '../api/auth';
 import { cleanTrackerName, getTrackerCategory, CANONICAL_CATEGORIES } from '../data/canonicalTrackers';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 export type ViewMode =
   | 'DASHBOARD'
@@ -216,7 +217,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </div>
 
       <button
-        onClick={() => { setActiveView('DASHBOARD'); setSelectedTracker(null); }}
+        {...createNewTabHandlers({ view: 'DASHBOARD', label: 'Project Dashboard' }, () => { setActiveView('DASHBOARD'); setSelectedTracker(null); })}
+        title="Project Dashboard&#10;💡 [Ctrl + Right-Click] Open in new tab"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -408,10 +410,19 @@ export const Sidebar: React.FC<SidebarProps> = ({
               }}
             >
               <button
-                onClick={() => {
-                  setSelectedTracker(t);
-                  setActiveView('TRACKER');
-                }}
+                {...createNewTabHandlers(
+                  {
+                    view: 'TRACKER',
+                    trackerId: t.id,
+                    trackerKey: t.key,
+                    label: cleanName
+                  },
+                  () => {
+                    setSelectedTracker(t);
+                    setActiveView('TRACKER');
+                  }
+                )}
+                title={`${cleanName} (${t.key})\n💡 [Ctrl + Right-Click] Open in new tab`}
                 style={{
                   display: 'flex',
                   alignItems: 'center',

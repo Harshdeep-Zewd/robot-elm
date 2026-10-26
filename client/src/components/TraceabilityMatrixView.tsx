@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GitCompare, Check, ArrowRight, ShieldCheck, AlertCircle } from 'lucide-react';
 import { Tracker, EngineeringObject, Relationship } from '../types/elm';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface TraceabilityMatrixViewProps {
   trackers: Tracker[];
@@ -125,23 +126,49 @@ export const TraceabilityMatrixView: React.FC<TraceabilityMatrixViewProps> = ({
                 <th style={{ padding: '14px', textTransform: 'uppercase', fontSize: '0.75rem', color: 'var(--text-muted)', textAlign: 'left', minWidth: '220px' }}>
                   SOURCE \ TARGET
                 </th>
-                {targets.map((target) => (
-                  <th key={target.id} style={{ padding: '12px', fontSize: '0.8rem', minWidth: '130px' }}>
-                    <div style={{ color: 'var(--accent-cyan)', fontWeight: 700 }} className="mono">{target.object_key}</div>
-                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '130px' }}>
-                      {target.title}
-                    </div>
-                  </th>
-                ))}
+                {targets.map((target) => {
+                  const targetHandlers = createNewTabHandlers({
+                    view: 'TRACKER',
+                    trackerId: target.tracker_id,
+                    objectId: target.id,
+                    objectKey: target.object_key,
+                    label: `[${target.object_key}] ${target.title}`
+                  });
+                  return (
+                    <th
+                      key={target.id}
+                      {...targetHandlers}
+                      title={`[${target.object_key}] ${target.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
+                      style={{ padding: '12px', fontSize: '0.8rem', minWidth: '130px', cursor: 'pointer' }}
+                    >
+                      <div style={{ color: 'var(--accent-cyan)', fontWeight: 700 }} className="mono">{target.object_key}</div>
+                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 400, textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap', maxWidth: '130px' }}>
+                        {target.title}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {sources.map((source) => (
-                <tr key={source.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                  <td style={{ padding: '12px 16px', textAlign: 'left', backgroundColor: 'var(--bg-sidebar)' }}>
-                    <div style={{ fontWeight: 700, color: 'var(--accent-cyan)' }} className="mono">{source.object_key}</div>
-                    <div style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>{source.title}</div>
-                  </td>
+              {sources.map((source) => {
+                const sourceHandlers = createNewTabHandlers({
+                  view: 'TRACKER',
+                  trackerId: source.tracker_id,
+                  objectId: source.id,
+                  objectKey: source.object_key,
+                  label: `[${source.object_key}] ${source.title}`
+                });
+                return (
+                  <tr key={source.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                    <td
+                      {...sourceHandlers}
+                      title={`[${source.object_key}] ${source.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
+                      style={{ padding: '12px 16px', textAlign: 'left', backgroundColor: 'var(--bg-sidebar)', cursor: 'pointer' }}
+                    >
+                      <div style={{ fontWeight: 700, color: 'var(--accent-cyan)' }} className="mono">{source.object_key}</div>
+                      <div style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>{source.title}</div>
+                    </td>
                   {targets.map((target) => {
                     const isLinked = hasLink(source.id, target.id);
                     return (

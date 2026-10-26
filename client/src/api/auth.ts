@@ -50,8 +50,7 @@ const setStored = <T,>(key: string, value: T) => {
 
 const getStoredSession = <T,>(key: string, fallback: T): T => {
   try {
-    localStorage.removeItem('roboserv_auth_current_user');
-    const s = sessionStorage.getItem(`roboserv_auth_${key}`);
+    const s = sessionStorage.getItem(`roboserv_auth_${key}`) || localStorage.getItem(`roboserv_auth_${key}`);
     if (s) return JSON.parse(s);
   } catch (e) {
     console.error('Session storage error for auth key:', key, e);
@@ -62,6 +61,7 @@ const getStoredSession = <T,>(key: string, fallback: T): T => {
 const setStoredSession = <T,>(key: string, value: T) => {
   try {
     sessionStorage.setItem(`roboserv_auth_${key}`, JSON.stringify(value));
+    localStorage.setItem(`roboserv_auth_${key}`, JSON.stringify(value));
   } catch (e) {
     console.error('Save session error for auth key:', key, e);
   }
@@ -91,14 +91,8 @@ export class AuthService {
     this.projectRequests = getStored<ProjectRequest[]>('project_requests', INITIAL_PROJECT_REQUESTS);
     this.trackerRequests = getStored<TrackerRequest[]>('tracker_requests', INITIAL_TRACKER_REQUESTS);
     
-    // Always purge stored user session so tab restoration (Ctrl+Shift+T) or new tabs force re-authentication
-    try {
-      sessionStorage.removeItem('roboserv_auth_current_user');
-      localStorage.removeItem('roboserv_auth_current_user');
-    } catch (e) {
-      console.error('Failed to clear storage:', e);
-    }
-    this.currentUser = null;
+    // Restore authenticated session across multi-tab workflows
+    this.currentUser = getStoredSession<User | null>('current_user', null);
   }
 
   public getUsers(): User[] {
