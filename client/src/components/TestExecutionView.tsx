@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Play, CheckCircle2, XCircle, AlertOctagon, HelpCircle, Plus, Activity, Layers, User, Settings, Check, X } from 'lucide-react';
+import { Play, CheckCircle2, XCircle, AlertOctagon, HelpCircle, Plus, Activity, Layers, User, Settings, Check, X, ChevronDown, ChevronUp, ChevronRight, ArrowLeft } from 'lucide-react';
 import { TestRun, Project, Tracker, EngineeringObject, TestStep, Relationship, User as UserType } from '../types/elm';
 import { createNewTabHandlers } from '../utils/tabOpener';
 
@@ -14,6 +14,8 @@ interface TestExecutionViewProps {
   testRunDetailsMap?: Record<number, any>;
   onUpdateTestRuns?: React.Dispatch<React.SetStateAction<TestRun[]>>;
   onUpdateRunDetailsMap?: React.Dispatch<React.SetStateAction<Record<number, any>>>;
+  onBack?: () => void;
+  onNavigateView?: (view: any) => void;
 }
 
 export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
@@ -26,7 +28,9 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   testRuns = [],
   testRunDetailsMap = {},
   onUpdateTestRuns,
-  onUpdateRunDetailsMap
+  onUpdateRunDetailsMap,
+  onBack,
+  onNavigateView
 }) => {
   // Filter objects and runs strictly for the current active project
   const currentTrackerIds = currentTrackers.map(t => t.id);
@@ -46,6 +50,38 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   const [testerName, setTesterName] = useState(currentUser?.name || 'Zewd');
   const [configName, setConfigName] = useState(`${activeProject?.key || 'PROJ'} Hardware Config Rev 1`);
   const [swVersion, setSwVersion] = useState('v1.0.0-release');
+
+  // Test Case Dropdown & Expansion State
+  const [expandedCaseIds, setExpandedCaseIds] = useState<Set<number>>(new Set());
+  const [selectedCaseFilter, setSelectedCaseFilter] = useState<string>('ALL');
+
+  const toggleCaseExpanded = (caseId: number) => {
+    setExpandedCaseIds(prev => {
+      const next = new Set(prev);
+      if (next.has(caseId)) {
+        next.delete(caseId);
+      } else {
+        next.add(caseId);
+      }
+      return next;
+    });
+  };
+
+  const handleExpandAll = () => {
+    if (activeRunDetail?.caseResults) {
+      setExpandedCaseIds(new Set(activeRunDetail.caseResults.map((c: any) => c.id)));
+    }
+  };
+
+  const handleCollapseAll = () => {
+    setExpandedCaseIds(new Set());
+  };
+
+  // Reset dropdown filters and expansion when changing selected run
+  useEffect(() => {
+    setSelectedCaseFilter('ALL');
+    setExpandedCaseIds(new Set());
+  }, [selectedRunId]);
 
   // Sync selected run ID when project, runs, or active selection changes
   useEffect(() => {
@@ -290,6 +326,59 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Test Runs Sidebar */}
       <div style={{ width: '300px', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-sidebar)', padding: '16px 12px', overflowY: 'auto', display: 'flex', flexDirection: 'column' }}>
+        {/* Navigation back buttons */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '14px' }}>
+          {onBack && (
+            <button
+              type="button"
+              onClick={onBack}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-main)',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                transition: 'all 0.15s ease'
+              }}
+              title="Back to Project Dashboard"
+            >
+              <ArrowLeft size={13} />
+              <span>Dashboard</span>
+            </button>
+          )}
+
+          {onNavigateView && (
+            <button
+              type="button"
+              onClick={() => onNavigateView('TRACKER')}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '5px',
+                backgroundColor: 'var(--bg-card)',
+                border: '1px solid var(--border-color)',
+                color: 'var(--text-muted)',
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                padding: '5px 10px',
+                borderRadius: '6px',
+                transition: 'all 0.15s ease'
+              }}
+              title="Open Engineering Trackers"
+            >
+              <Layers size={13} />
+              <span>Trackers</span>
+            </button>
+          )}
+        </div>
+
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>
             Test Runs ({projectRuns.length})
@@ -399,9 +488,104 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
               </div>
             </div>
 
-            {/* Test Case Execution Cards */}
+            {/* Test Cases List Header & Quick Filter Dropdown */}
+            {activeRunDetail.caseResults?.length > 0 && (
+              <div style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                marginBottom: '16px',
+                gap: '12px',
+                flexWrap: 'wrap',
+                backgroundColor: 'var(--bg-card)',
+                padding: '12px 18px',
+                borderRadius: '8px',
+                border: '1px solid var(--border-color)'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                    Test Cases ({activeRunDetail.caseResults.length})
+                  </span>
+
+                  {/* Dropdown selector for test cases */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      Filter / Select:
+                    </label>
+                    <select
+                      value={selectedCaseFilter}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedCaseFilter(val);
+                        if (val !== 'ALL') {
+                          setExpandedCaseIds(new Set([Number(val)]));
+                        }
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        borderRadius: '6px',
+                        backgroundColor: 'var(--bg-dark)',
+                        border: '1px solid var(--border-color)',
+                        color: 'var(--accent-cyan)',
+                        fontSize: '0.8rem',
+                        fontWeight: 600,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="ALL">All Test Cases ({activeRunDetail.caseResults.length})</option>
+                      {activeRunDetail.caseResults.map((c: any) => (
+                        <option key={c.id} value={c.id}>
+                          [{c.case_key}] {c.case_title} ({c.status || 'NOT_RUN'})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    type="button"
+                    onClick={handleExpandAll}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      backgroundColor: 'var(--bg-dark)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--accent-cyan)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Expand All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCollapseAll}
+                    style={{
+                      padding: '5px 12px',
+                      borderRadius: '6px',
+                      fontSize: '0.75rem',
+                      fontWeight: 600,
+                      backgroundColor: 'var(--bg-dark)',
+                      border: '1px solid var(--border-color)',
+                      color: 'var(--text-muted)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Collapse All
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Test Case Execution Cards with Dropdown Accordion */}
             {activeRunDetail.caseResults?.length > 0 ? (
-              activeRunDetail.caseResults.map((cr: any) => {
+              (selectedCaseFilter === 'ALL'
+                ? activeRunDetail.caseResults
+                : activeRunDetail.caseResults.filter((c: any) => String(c.id) === selectedCaseFilter)
+              ).map((cr: any) => {
+                const isExpanded = expandedCaseIds.has(cr.id);
                 const caseTabHandlers = createNewTabHandlers({
                   view: 'TRACKER',
                   objectKey: cr.case_key,
@@ -409,123 +593,230 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
                 });
 
                 return (
-                  <div key={cr.id} style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '20px', marginBottom: '20px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-                      <div
-                        {...caseTabHandlers}
-                        title={`[${cr.case_key}] ${cr.case_title}\n💡 [Ctrl + Right-Click] Open in new tab`}
-                        style={{ cursor: 'pointer' }}
-                      >
-                        <span className="mono" style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '3px 8px', borderRadius: '4px', marginRight: '10px' }}>
-                          {cr.case_key}
-                        </span>
-                        <h3 style={{ fontSize: '1.1rem', fontWeight: 700, display: 'inline', color: 'var(--text-main)' }}>{cr.case_title}</h3>
-                      </div>
-                      <span className={`badge badge-${(cr.status || 'NOT_RUN').toLowerCase().replace(/_/g, '-')}`}>
-                        {cr.status || 'NOT_RUN'}
-                      </span>
-                    </div>
+                  <div
+                    key={cr.id}
+                    style={{
+                      backgroundColor: 'var(--bg-card)',
+                      border: `1px solid ${isExpanded ? 'rgba(56, 189, 248, 0.4)' : 'var(--border-color)'}`,
+                      borderRadius: '10px',
+                      marginBottom: '16px',
+                      overflow: 'hidden',
+                      transition: 'all 0.15s ease',
+                      boxShadow: isExpanded ? '0 4px 16px rgba(0,0,0,0.25)' : 'none'
+                    }}
+                  >
+                    {/* Clickable Header Dropdown Bar */}
+                    <div
+                      onClick={() => toggleCaseExpanded(cr.id)}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '16px 20px',
+                        cursor: 'pointer',
+                        backgroundColor: isExpanded ? 'rgba(56, 189, 248, 0.04)' : 'transparent',
+                        borderBottom: isExpanded ? '1px solid var(--border-color)' : 'none',
+                        userSelect: 'none',
+                        transition: 'background-color 0.15s ease'
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '26px',
+                            height: '26px',
+                            borderRadius: '6px',
+                            backgroundColor: isExpanded ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            color: isExpanded ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                            transition: 'all 0.2s ease'
+                          }}
+                        >
+                          <ChevronDown
+                            size={16}
+                            style={{
+                              transform: isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)',
+                              transition: 'transform 0.2s ease'
+                            }}
+                          />
+                        </div>
 
-                  {/* Ordered Step List */}
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                    {cr.steps?.map((step: any) => (
-                      <div key={step.id} style={{ backgroundColor: 'var(--bg-dark)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-                          <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
-                            Procedure Step #{step.step_number}
+                        <div
+                          {...caseTabHandlers}
+                          title={`[${cr.case_key}] ${cr.case_title}\n💡 [Ctrl + Right-Click] Open in new tab`}
+                        >
+                          <span
+                            className="mono"
+                            style={{
+                              fontSize: '0.95rem',
+                              fontWeight: 800,
+                              color: 'var(--accent-cyan)',
+                              backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                              padding: '3px 8px',
+                              borderRadius: '4px',
+                              marginRight: '10px'
+                            }}
+                          >
+                            {cr.case_key}
                           </span>
-
-                          {/* Interactive Step Pass / Fail / Blocked Controls */}
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            <button
-                              onClick={() => handleUpdateStepStatus(step.id, cr.id, 'PASS')}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '6px',
-                                backgroundColor: step.status === 'PASS' ? 'var(--accent-emerald)' : 'rgba(16, 185, 129, 0.15)',
-                                color: step.status === 'PASS' ? '#000' : 'var(--accent-emerald)',
-                                border: `1px solid ${step.status === 'PASS' ? 'var(--accent-emerald)' : 'rgba(16, 185, 129, 0.4)'}`,
-                                fontWeight: 800,
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <CheckCircle2 size={14} />
-                              <span>PASS</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleUpdateStepStatus(step.id, cr.id, 'FAIL')}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '6px',
-                                backgroundColor: step.status === 'FAIL' ? 'var(--accent-rose)' : 'rgba(239, 68, 68, 0.15)',
-                                color: step.status === 'FAIL' ? '#fff' : 'var(--accent-rose)',
-                                border: `1px solid ${step.status === 'FAIL' ? 'var(--accent-rose)' : 'rgba(239, 68, 68, 0.4)'}`,
-                                fontWeight: 800,
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <XCircle size={14} />
-                              <span>FAIL</span>
-                            </button>
-
-                            <button
-                              onClick={() => handleUpdateStepStatus(step.id, cr.id, 'BLOCKED')}
-                              style={{
-                                padding: '6px 14px',
-                                borderRadius: '6px',
-                                backgroundColor: step.status === 'BLOCKED' ? 'var(--accent-amber)' : 'rgba(245, 158, 11, 0.15)',
-                                color: step.status === 'BLOCKED' ? '#000' : 'var(--accent-amber)',
-                                border: `1px solid ${step.status === 'BLOCKED' ? 'var(--accent-amber)' : 'rgba(245, 158, 11, 0.4)'}`,
-                                fontWeight: 800,
-                                fontSize: '0.8rem',
-                                cursor: 'pointer',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                              }}
-                            >
-                              <AlertOctagon size={14} />
-                              <span>BLOCKED</span>
-                            </button>
-                          </div>
+                          <h3 style={{ fontSize: '1.05rem', fontWeight: 700, display: 'inline', color: 'var(--text-main)' }}>
+                            {cr.case_title}
+                          </h3>
+                          <span
+                            style={{
+                              fontSize: '0.72rem',
+                              color: 'var(--text-muted)',
+                              backgroundColor: 'var(--bg-dark)',
+                              padding: '2px 8px',
+                              borderRadius: '10px',
+                              marginLeft: '10px',
+                              border: '1px solid var(--border-color)'
+                            }}
+                          >
+                            {cr.steps?.length || 0} {cr.steps?.length === 1 ? 'Step' : 'Steps'}
+                          </span>
                         </div>
+                      </div>
 
-                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
-                          <strong>Action:</strong> {step.action}
-                        </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <span className={`badge badge-${(cr.status || 'NOT_RUN').toLowerCase().replace(/_/g, '-')}`}>
+                          {cr.status || 'NOT_RUN'}
+                        </span>
 
-                        <div style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>
-                          <strong>Expected Result:</strong> {step.expected_result}
-                        </div>
-
-                        {/* Actual Result Telemetry / Notes */}
-                        <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--border-color)' }}>
-                          <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                            Recorded Telemetry / Actual Result Output:
-                          </label>
-                          <input
-                            type="text"
-                            value={step.actual_result || ''}
-                            onChange={(e) => handleUpdateStepStatus(step.id, cr.id, step.status === 'NOT_RUN' ? 'PASS' : step.status, e.target.value)}
-                            placeholder="Enter measured output, logs, or verification notes..."
-                            style={{ width: '100%', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)' }}
+                        <div
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '5px',
+                            padding: '5px 12px',
+                            borderRadius: '6px',
+                            backgroundColor: isExpanded ? 'rgba(56, 189, 248, 0.15)' : 'var(--bg-dark)',
+                            border: `1px solid ${isExpanded ? 'var(--accent-cyan)' : 'var(--border-color)'}`,
+                            color: isExpanded ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            transition: 'all 0.15s ease'
+                          }}
+                        >
+                          <span>{isExpanded ? 'Hide Steps' : 'View Steps'}</span>
+                          <ChevronDown
+                            size={13}
+                            style={{
+                              transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease'
+                            }}
                           />
                         </div>
                       </div>
-                    ))}
+                    </div>
+
+                    {/* Dropped-down Steps with PASS, FAIL, BLOCKED controls */}
+                    {isExpanded && (
+                      <div style={{ padding: '20px', display: 'flex', flexDirection: 'column', gap: '12px', backgroundColor: 'rgba(0,0,0,0.1)' }}>
+                        {cr.steps?.map((step: any) => (
+                          <div key={step.id} style={{ backgroundColor: 'var(--bg-dark)', padding: '16px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                              <span style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--accent-cyan)' }}>
+                                Procedure Step #{step.step_number}
+                              </span>
+
+                              {/* Interactive Step Pass / Fail / Blocked Controls */}
+                              <div style={{ display: 'flex', gap: '8px' }}>
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStepStatus(step.id, cr.id, 'PASS')}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '6px',
+                                    backgroundColor: step.status === 'PASS' ? 'var(--accent-emerald)' : 'rgba(16, 185, 129, 0.15)',
+                                    color: step.status === 'PASS' ? '#000' : 'var(--accent-emerald)',
+                                    border: `1px solid ${step.status === 'PASS' ? 'var(--accent-emerald)' : 'rgba(16, 185, 129, 0.4)'}`,
+                                    fontWeight: 800,
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <CheckCircle2 size={14} />
+                                  <span>PASS</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStepStatus(step.id, cr.id, 'FAIL')}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '6px',
+                                    backgroundColor: step.status === 'FAIL' ? 'var(--accent-rose)' : 'rgba(239, 68, 68, 0.15)',
+                                    color: step.status === 'FAIL' ? '#fff' : 'var(--accent-rose)',
+                                    border: `1px solid ${step.status === 'FAIL' ? 'var(--accent-rose)' : 'rgba(239, 68, 68, 0.4)'}`,
+                                    fontWeight: 800,
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <XCircle size={14} />
+                                  <span>FAIL</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleUpdateStepStatus(step.id, cr.id, 'BLOCKED')}
+                                  style={{
+                                    padding: '6px 14px',
+                                    borderRadius: '6px',
+                                    backgroundColor: step.status === 'BLOCKED' ? 'var(--accent-amber)' : 'rgba(245, 158, 11, 0.15)',
+                                    color: step.status === 'BLOCKED' ? '#000' : 'var(--accent-amber)',
+                                    border: `1px solid ${step.status === 'BLOCKED' ? 'var(--accent-amber)' : 'rgba(245, 158, 11, 0.4)'}`,
+                                    fontWeight: 800,
+                                    fontSize: '0.8rem',
+                                    cursor: 'pointer',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <AlertOctagon size={14} />
+                                  <span>BLOCKED</span>
+                                </button>
+                              </div>
+                            </div>
+
+                            <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px' }}>
+                              <strong>Action:</strong> {step.action}
+                            </div>
+
+                            <div style={{ fontSize: '0.8rem', color: 'var(--accent-emerald)' }}>
+                              <strong>Expected Result:</strong> {step.expected_result}
+                            </div>
+
+                            {/* Actual Result Telemetry / Notes */}
+                            <div style={{ marginTop: '10px', paddingTop: '8px', borderTop: '1px dashed var(--border-color)' }}>
+                              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                                Recorded Telemetry / Actual Result Output:
+                              </label>
+                              <input
+                                type="text"
+                                value={step.actual_result || ''}
+                                onChange={(e) => handleUpdateStepStatus(step.id, cr.id, step.status === 'NOT_RUN' ? 'PASS' : step.status, e.target.value)}
+                                placeholder="Enter measured output, logs, or verification notes..."
+                                style={{ width: '100%', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)' }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                </div>
-              );
-            })
+                );
+              })
             ) : (
               <div style={{ color: 'var(--text-muted)', textAlign: 'center', padding: '60px', backgroundColor: 'var(--bg-card)', borderRadius: '10px', border: '1px solid var(--border-color)' }}>
                 No test cases registered for this test run.

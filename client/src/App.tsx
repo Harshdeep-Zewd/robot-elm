@@ -1473,7 +1473,7 @@ export const App: React.FC = () => {
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        {activeView !== 'TRACKER' && (
+        {activeView !== 'TRACKER' && activeView !== 'TEST_EXECUTION' && (
           <Sidebar
             trackers={currentTrackers}
             activeView={activeView}
@@ -1557,6 +1557,8 @@ export const App: React.FC = () => {
               testRunDetailsMap={testRunDetailsMap}
               onUpdateTestRuns={setTestRuns}
               onUpdateRunDetailsMap={setTestRunDetailsMap}
+              onBack={() => setActiveView('DASHBOARD')}
+              onNavigateView={(view) => setActiveView(view)}
             />
           )}
 
