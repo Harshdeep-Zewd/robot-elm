@@ -16,6 +16,8 @@ interface TestExecutionViewProps {
   onUpdateRunDetailsMap?: React.Dispatch<React.SetStateAction<Record<number, any>>>;
   onBack?: () => void;
   onNavigateView?: (view: any) => void;
+  selectedRunIdProp?: number | null;
+  onSelectRunIdProp?: (id: number | null) => void;
 }
 
 export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
@@ -30,7 +32,9 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   onUpdateTestRuns,
   onUpdateRunDetailsMap,
   onBack,
-  onNavigateView
+  onNavigateView,
+  selectedRunIdProp,
+  onSelectRunIdProp
 }) => {
   // Filter objects and runs strictly for the current active project
   const currentTrackerIds = currentTrackers.map(t => t.id);
@@ -85,6 +89,10 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
 
   // Sync selected run ID when project, runs, or active selection changes
   useEffect(() => {
+    if (selectedRunIdProp) {
+      setSelectedRunId(selectedRunIdProp);
+      return;
+    }
     const pRuns = testRuns.filter(r => r.project_id === activeProject?.id);
     if (pRuns.length > 0) {
       if (!selectedRunId || !pRuns.some(r => r.id === selectedRunId)) {
@@ -93,7 +101,7 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
     } else {
       setSelectedRunId(null);
     }
-  }, [testRuns, activeProject?.id, selectedRunId]);
+  }, [testRuns, activeProject?.id, selectedRunId, selectedRunIdProp]);
 
   // Dynamically build detail if a run exists but has no entry in map
   useEffect(() => {

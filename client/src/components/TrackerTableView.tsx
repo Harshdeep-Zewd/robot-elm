@@ -60,6 +60,7 @@ interface TrackerTableViewProps {
   onDeleteArtifact?: (id: number) => void;
   onSelectObjectForImpact?: (objId: number) => void;
   onCreateTestRun?: (testSet: EngineeringObject) => { newRunObj: EngineeringObject; newTestRun: any; testRunTracker: Tracker };
+  onNavigateToTestRun?: (runId: number) => void;
   onNavigateTracker?: (tracker: Tracker, objectId?: number) => void;
   onNavigateView?: (view: any) => void;
   onBackToDashboard?: () => void;
@@ -87,6 +88,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   onDeleteArtifact,
   onSelectObjectForImpact,
   onCreateTestRun,
+  onNavigateToTestRun,
   onNavigateTracker,
   onNavigateView,
   onBackToDashboard
@@ -187,6 +189,58 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
     runId: number;
     testRunTracker: Tracker;
   } | null>(null);
+
+  // Set of Test Set IDs whose created test runs dropdown is currently open
+  const [openRunsDropdownSetIds, setOpenRunsDropdownSetIds] = useState<Set<number>>(new Set());
+
+  const toggleRunsDropdown = (testSetId: number) => {
+    setOpenRunsDropdownSetIds(prev => {
+      const next = new Set(prev);
+      if (next.has(testSetId)) next.delete(testSetId);
+      else next.add(testSetId);
+      return next;
+    });
+  };
+
+  const getTestRunsForSet = (testSet: EngineeringObject) => {
+    // 1. Matched by test_set_id or test_set_key in testRuns array
+    const matchedFromTestRuns = testRuns.filter(r =>
+      r.test_set_id === testSet.id ||
+      (r.test_set_key && (r.test_set_key === testSet.object_key || r.test_set_key === testSet.title))
+    );
+
+    // 2. Matched by EXECUTED_FROM relationship
+    const runRelIds = relationships
+      .filter(rel => rel.target_id === testSet.id && rel.relationship_type === 'EXECUTED_FROM')
+      .map(rel => rel.source_id);
+
+    // 3. Match from allObjects
+    const runObjs = allObjects.filter(o =>
+      runRelIds.includes(o.id) ||
+      (o.type === 'TEST_RUN' && o.pre_action && o.pre_action.includes(testSet.object_key))
+    );
+
+    const allRunIds = Array.from(new Set<number>([
+      ...matchedFromTestRuns.map(r => r.id),
+      ...runRelIds,
+      ...runObjs.map(o => o.id)
+    ]));
+
+    return allRunIds.map(runId => {
+      const tr = matchedFromTestRuns.find(r => r.id === runId) || testRuns.find(r => r.id === runId);
+      const obj = runObjs.find(o => o.id === runId) || allObjects.find(o => o.id === runId);
+      return {
+        id: runId,
+        name: tr?.name || obj?.title || `Test Run #${runId}`,
+        key: obj?.object_key || (tr?.test_set_key ? `${tr.test_set_key}-RUN` : `TR-${String(runId).slice(-3)}`),
+        status: tr?.overall_status || (obj?.status as any) || 'NOT_RUN',
+        tester_name: tr?.tester_name || obj?.owner_name || 'Zewd',
+        started_at: tr?.started_at || obj?.created_at,
+        config_name: tr?.config_name || 'RoboServ-X1 Hardware Configuration',
+        software_version: tr?.software_version || 'v1.0.0-release'
+      };
+    });
+  };
 
   const handleTriggerCreateTestRun = (testSet: EngineeringObject) => {
     if (!onCreateTestRun) return;
@@ -508,6 +562,8 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
         relationships={relationships}
         testSteps={testSteps}
         artifacts={artifacts}
+        testRuns={testRuns}
+        onNavigateToTestRun={onNavigateToTestRun}
         onUpdateObject={(id, updates) => {
           onUpdateObject(id, updates);
           setEditingObject(prev => prev ? { ...prev, ...updates } : null);
@@ -1418,7 +1474,11 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                         )}
 
                         {/* If Test Set tracker: Grouped Test Cases for Verification */}
-                        {isTestSetTracker && (
+                        {isTestSetTracker && (() => {
+                          const setRuns = getTestRunsForSet(obj);
+                          const isRunsOpen = openRunsDropdownSetIds.has(obj.id);
+
+                          return (
                           <div style={{
                             backgroundColor: 'var(--bg-card)',
                             border: '1px solid var(--border-color)',
@@ -1436,6 +1496,37 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               </div>
 
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                {/* Button / Dropdown Toggle for Created Test Runs */}
+                                <button
+                                  type="button"
+                                  onClick={() => toggleRunsDropdown(obj.id)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: '6px',
+                                    backgroundColor: isRunsOpen ? 'rgba(56, 189, 248, 0.22)' : setRuns.length > 0 ? 'rgba(56, 189, 248, 0.12)' : 'var(--bg-dark)',
+                                    border: `1px solid ${isRunsOpen || setRuns.length > 0 ? 'rgba(56, 189, 248, 0.45)' : 'var(--border-color)'}`,
+                                    color: isRunsOpen || setRuns.length > 0 ? 'var(--accent-cyan)' : 'var(--text-muted)',
+                                    padding: '5px 12px',
+                                    borderRadius: '6px',
+                                    fontSize: '0.78rem',
+                                    fontWeight: 700,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s ease'
+                                  }}
+                                  title={`Click to view details of ${setRuns.length} Test Run${setRuns.length === 1 ? '' : 's'} created from this Test Set`}
+                                >
+                                  <Activity size={13} />
+                                  <span>Test Runs ({setRuns.length})</span>
+                                  <ChevronDown
+                                    size={13}
+                                    style={{
+                                      transform: isRunsOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                                      transition: 'transform 0.2s ease'
+                                    }}
+                                  />
+                                </button>
+
                                 <button
                                   type="button"
                                   onClick={() => setManagingTestSet(obj)}
@@ -1485,6 +1576,115 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                 )}
                               </div>
                             </div>
+
+                            {/* Test Runs Details Dropdown Section */}
+                            {isRunsOpen && (
+                              <div style={{
+                                marginBottom: '16px',
+                                backgroundColor: 'var(--bg-dark)',
+                                border: '1px solid rgba(56, 189, 248, 0.35)',
+                                borderRadius: '8px',
+                                padding: '14px 16px',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.3)'
+                              }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                    <Activity size={15} color="var(--accent-cyan)" />
+                                    <span style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                      Test Runs Created from [{obj.object_key}] ({setRuns.length})
+                                    </span>
+                                  </div>
+                                  <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                    All execution runs created from this test set
+                                  </span>
+                                </div>
+
+                                {setRuns.length > 0 ? (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {setRuns.map(run => (
+                                      <div
+                                        key={run.id}
+                                        style={{
+                                          display: 'flex',
+                                          alignItems: 'center',
+                                          justifyContent: 'space-between',
+                                          padding: '10px 14px',
+                                          borderRadius: '6px',
+                                          backgroundColor: 'var(--bg-card)',
+                                          border: '1px solid var(--border-color)',
+                                          gap: '12px',
+                                          flexWrap: 'wrap'
+                                        }}
+                                      >
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                          <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '2px 7px', borderRadius: '4px' }}>
+                                            {run.key}
+                                          </span>
+                                          <div>
+                                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                                              {run.name}
+                                            </div>
+                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                              <span>Tester: <strong>{run.tester_name}</strong></span>
+                                              <span>•</span>
+                                              <span>Date: {run.started_at ? new Date(run.started_at).toLocaleString() : 'Recent'}</span>
+                                              <span>•</span>
+                                              <span>Config: {run.config_name}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                          <span className={`badge badge-${(run.status || 'NOT_RUN').toLowerCase().replace(/_/g, '-')}`}>
+                                            {run.status || 'NOT_RUN'}
+                                          </span>
+
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              if (onNavigateToTestRun) {
+                                                onNavigateToTestRun(run.id);
+                                              } else if (onNavigateView) {
+                                                onNavigateView('TEST_EXECUTION');
+                                              }
+                                            }}
+                                            style={{
+                                              display: 'flex',
+                                              alignItems: 'center',
+                                              gap: '5px',
+                                              padding: '5px 12px',
+                                              borderRadius: '6px',
+                                              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                                              border: '1px solid rgba(16, 185, 129, 0.4)',
+                                              color: 'var(--accent-emerald)',
+                                              fontSize: '0.75rem',
+                                              fontWeight: 700,
+                                              cursor: 'pointer'
+                                            }}
+                                            title="Open this Test Run in the Execution dashboard"
+                                          >
+                                            <Play size={12} />
+                                            <span>Execute / View Run ↗</span>
+                                          </button>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div style={{
+                                    padding: '16px',
+                                    textAlign: 'center',
+                                    color: 'var(--text-muted)',
+                                    fontSize: '0.8rem',
+                                    backgroundColor: 'var(--bg-card)',
+                                    borderRadius: '6px',
+                                    border: '1px dashed var(--border-color)'
+                                  }}>
+                                    No test runs have been created from this test set yet. Click <strong>"Create Test Run"</strong> above to generate the first run in the single Test Runs tracker.
+                                  </div>
+                                )}
+                              </div>
+                            )}
 
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                               {incCases.length === 0 ? (
@@ -1588,7 +1788,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               )}
                             </div>
                           </div>
-                        )}
+                        ); })()}
 
                         {/* If Test Run tracker: Execution Test Run Summary */}
                         {isTestRunTracker && (
@@ -1768,52 +1968,39 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
               </div>
 
               {/* Quick Actions for Test Sets */}
-              {isTestSetTracker && (
-                <div style={{
-                  backgroundColor: 'var(--bg-dark)',
-                  border: '1px solid var(--border-color)',
-                  padding: '12px 14px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '10px'
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                      Test Set Verification Group
-                    </span>
-                    <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontWeight: 700 }}>
-                      {relationships.filter(r => r.target_id === activeObject.id && r.relationship_type === 'INCLUDED_IN').length} Cases
-                    </span>
-                  </div>
+              {isTestSetTracker && (() => {
+                const setRuns = getTestRunsForSet(activeObject);
+                const isRunsOpen = openRunsDropdownSetIds.has(activeObject.id);
+                return (
+                  <div style={{
+                    backgroundColor: 'var(--bg-dark)',
+                    border: '1px solid var(--border-color)',
+                    padding: '12px 14px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '10px'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        Test Set Verification Group
+                      </span>
+                      <span style={{ fontSize: '0.75rem', color: 'var(--accent-cyan)', fontWeight: 700 }}>
+                        {relationships.filter(r => r.target_id === activeObject.id && r.relationship_type === 'INCLUDED_IN').length} Cases
+                      </span>
+                    </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
-                    <button
-                      type="button"
-                      onClick={() => setManagingTestSet(activeObject)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '5px',
-                        padding: '6px 10px',
-                        borderRadius: '6px',
-                        backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                        border: '1px solid rgba(56, 189, 248, 0.35)',
-                        color: 'var(--accent-cyan)',
-                        fontSize: '0.75rem',
-                        fontWeight: 700,
-                        cursor: 'pointer'
-                      }}
-                    >
-                      <Plus size={12} />
-                      <span>Add Cases</span>
-                    </button>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: 'var(--text-muted)', borderTop: '1px dashed var(--border-color)', paddingTop: '6px' }}>
+                      <span>Test Runs Created:</span>
+                      <strong style={{ color: setRuns.length > 0 ? 'var(--accent-emerald)' : 'var(--text-muted)' }}>
+                        {setRuns.length} Run{setRuns.length === 1 ? '' : 's'}
+                      </strong>
+                    </div>
 
-                    {onCreateTestRun && (
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
                       <button
                         type="button"
-                        onClick={() => handleTriggerCreateTestRun(activeObject)}
+                        onClick={() => setManagingTestSet(activeObject)}
                         style={{
                           display: 'flex',
                           alignItems: 'center',
@@ -1821,21 +2008,68 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                           gap: '5px',
                           padding: '6px 10px',
                           borderRadius: '6px',
-                          backgroundColor: 'rgba(16, 185, 129, 0.15)',
-                          border: '1px solid rgba(16, 185, 129, 0.4)',
-                          color: 'var(--accent-emerald)',
+                          backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                          border: '1px solid rgba(56, 189, 248, 0.35)',
+                          color: 'var(--accent-cyan)',
                           fontSize: '0.75rem',
                           fontWeight: 700,
                           cursor: 'pointer'
                         }}
                       >
-                        <Play size={12} />
-                        <span>Run Set</span>
+                        <Plus size={12} />
+                        <span>Add Cases</span>
                       </button>
-                    )}
+
+                      {onCreateTestRun && (
+                        <button
+                          type="button"
+                          onClick={() => handleTriggerCreateTestRun(activeObject)}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '5px',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                            border: '1px solid rgba(16, 185, 129, 0.4)',
+                            color: 'var(--accent-emerald)',
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            cursor: 'pointer'
+                          }}
+                        >
+                          <Play size={12} />
+                          <span>Run Set</span>
+                        </button>
+                      )}
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleRunsDropdown(activeObject.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '6px',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        backgroundColor: isRunsOpen ? 'rgba(56, 189, 248, 0.2)' : 'var(--bg-card)',
+                        border: '1px solid var(--border-color)',
+                        color: isRunsOpen ? 'var(--accent-cyan)' : 'var(--text-main)',
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <Activity size={12} />
+                      <span>{isRunsOpen ? 'Hide Runs Details' : `View ${setRuns.length} Test Runs`}</span>
+                      <ChevronDown size={12} style={{ transform: isRunsOpen ? 'rotate(180deg)' : 'none' }} />
+                    </button>
                   </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Quick Action for Test Runs */}
               {isTestRunTracker && onNavigateView && (

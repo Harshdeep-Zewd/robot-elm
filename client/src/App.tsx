@@ -733,6 +733,7 @@ export const App: React.FC = () => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [impactObjectId, setImpactObjectId] = useState<number | null>(null);
+  const [selectedTestRunId, setSelectedTestRunId] = useState<number | null>(null);
 
   // Sync browser Back/Forward navigation with URL
   useEffect(() => {
@@ -1259,6 +1260,11 @@ export const App: React.FC = () => {
     if (tracker) setSelectedTrackerId(tracker.id);
   };
 
+  const handleNavigateToTestRun = (runId: number) => {
+    setSelectedTestRunId(runId);
+    setActiveView('TEST_EXECUTION');
+  };
+
   const handleCreateTestRunFromSet = (testSet: EngineeringObject) => {
     // 1. Resolve folder name of test set and name format based on test set title
     const folder = allFolders.find(f => f.id === testSet.folder_id);
@@ -1522,6 +1528,7 @@ export const App: React.FC = () => {
               onDeleteArtifact={handleDeleteArtifact}
               onSelectObjectForImpact={handleSelectObjectForImpact}
               onCreateTestRun={handleCreateTestRunFromSet}
+              onNavigateToTestRun={handleNavigateToTestRun}
               onNavigateTracker={(tracker, objId) => {
                 setSelectedTrackerId(tracker.id);
                 setActiveView('TRACKER');
@@ -1559,6 +1566,8 @@ export const App: React.FC = () => {
               onUpdateRunDetailsMap={setTestRunDetailsMap}
               onBack={() => setActiveView('DASHBOARD')}
               onNavigateView={(view) => setActiveView(view)}
+              selectedRunIdProp={selectedTestRunId}
+              onSelectRunIdProp={setSelectedTestRunId}
             />
           )}
 
