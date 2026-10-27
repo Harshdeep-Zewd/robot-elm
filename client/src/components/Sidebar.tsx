@@ -489,7 +489,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       </button>
 
       <button
-        onClick={() => setActiveView('TEST_EXECUTION')}
+        {...createNewTabHandlers({ view: 'TEST_EXECUTION', label: 'Test Runner Suite' }, () => setActiveView('TEST_EXECUTION'))}
+        title="Test Runner Suite&#10;💡 [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab"
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -501,7 +502,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
           fontSize: '0.85rem',
           marginBottom: '2px',
           width: '100%',
-          textAlign: 'left'
+          textAlign: 'left',
+          border: 'none',
+          cursor: 'pointer'
         }}
       >
         <FlaskConical size={18} />

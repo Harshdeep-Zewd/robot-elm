@@ -12,6 +12,7 @@ import {
 } from '../types/elm';
 import { cleanTrackerName } from '../data/canonicalTrackers';
 import { CustomColumnCard } from './CustomColumnCard';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface RequirementEditDashboardProps {
   object: EngineeringObject;
@@ -1307,7 +1308,12 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
                             {onNavigateToTestRun && (
                               <button
                                 type="button"
-                                onClick={() => onNavigateToTestRun(run.id)}
+                                {...createNewTabHandlers({
+                                  projectKey: tracker?.prefix?.split('-')[0]?.toLowerCase() || 'robo',
+                                  view: 'test_execution',
+                                  runId: run.id,
+                                  label: run.name || `Test Run #${run.id}`
+                                }, () => onNavigateToTestRun(run.id))}
                                 style={{
                                   display: 'flex',
                                   alignItems: 'center',
@@ -1321,7 +1327,7 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
                                   fontWeight: 700,
                                   cursor: 'pointer'
                                 }}
-                                title="Open this Test Run in the Execution dashboard"
+                                title="Open this Test Run in the Execution dashboard&#10;💡 [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab"
                               >
                                 <Play size={12} />
                                 <span>Execute / View Run ↗</span>

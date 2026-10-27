@@ -1253,42 +1253,50 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                         </span>
 
                         {/* Quick Open in Console for Test Runs */}
-                        {isTestRunTracker && (onNavigateToTestRun || onNavigateView) && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onNavigateToTestRun) {
-                                const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
-                                const targetId = matchingRun ? matchingRun.id : obj.id;
-                                onNavigateToTestRun(targetId);
-                              } else if (onNavigateView) {
-                                onNavigateView('TEST_EXECUTION');
-                              }
-                            }}
-                            title="Open in Test Execution Console"
-                            style={{
-                              display: 'inline-flex',
-                              alignItems: 'center',
-                              gap: '6px',
-                              backgroundColor: '#0284c7',
-                              color: '#ffffff',
-                              border: 'none',
-                              padding: '5px 12px',
-                              borderRadius: '6px',
-                              fontSize: '0.75rem',
-                              fontWeight: 700,
-                              cursor: 'pointer',
-                              boxShadow: '0 2px 5px rgba(2, 132, 199, 0.3)',
-                              transition: 'all 0.15s ease'
-                            }}
-                            onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
-                            onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
-                          >
-                            <Play size={12} fill="#ffffff" />
-                            <span>Open in Console</span>
-                          </button>
-                        )}
+                        {isTestRunTracker && (onNavigateToTestRun || onNavigateView) && (() => {
+                          const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                          const targetId = matchingRun ? matchingRun.id : obj.id;
+                          const runTabHandlers = createNewTabHandlers({
+                            projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',
+                            view: 'test_execution',
+                            runId: targetId,
+                            label: obj.title || `Test Run #${targetId}`
+                          }, (e) => {
+                            e.stopPropagation();
+                            if (onNavigateToTestRun) {
+                              onNavigateToTestRun(targetId);
+                            } else if (onNavigateView) {
+                              onNavigateView('TEST_EXECUTION');
+                            }
+                          });
+                          return (
+                            <button
+                              type="button"
+                              {...runTabHandlers}
+                              title="Open in Test Execution Console&#10;💡 [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab"
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '6px',
+                                backgroundColor: '#0284c7',
+                                color: '#ffffff',
+                                border: 'none',
+                                padding: '5px 12px',
+                                borderRadius: '6px',
+                                fontSize: '0.75rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                boxShadow: '0 2px 5px rgba(2, 132, 199, 0.3)',
+                                transition: 'all 0.15s ease'
+                              }}
+                              onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
+                              onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
+                            >
+                              <Play size={12} fill="#ffffff" />
+                              <span>Open in Console</span>
+                            </button>
+                          );
+                        })()}
 
                         {/* Delete Button */}
                         {onDeleteObject && (
@@ -1708,13 +1716,18 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
 
                                           <button
                                             type="button"
-                                            onClick={() => {
+                                            {...createNewTabHandlers({
+                                              projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',
+                                              view: 'test_execution',
+                                              runId: run.id,
+                                              label: run.name || `Test Run #${run.id}`
+                                            }, () => {
                                               if (onNavigateToTestRun) {
                                                 onNavigateToTestRun(run.id);
                                               } else if (onNavigateView) {
                                                 onNavigateView('TEST_EXECUTION');
                                               }
-                                            }}
+                                            })}
                                             style={{
                                               display: 'flex',
                                               alignItems: 'center',
@@ -1728,7 +1741,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                               fontWeight: 700,
                                               cursor: 'pointer'
                                             }}
-                                            title="Open this Test Run in the Execution dashboard"
+                                            title="Open this Test Run in the Execution dashboard&#10;💡 [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab"
                                           >
                                             <Play size={12} />
                                             <span>Execute / View Run ↗</span>
@@ -1882,40 +1895,49 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                 })()}
                               </div>
 
-                              {(onNavigateToTestRun || onNavigateView) && (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (onNavigateToTestRun) {
-                                      const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
-                                      const targetId = matchingRun ? matchingRun.id : obj.id;
-                                      onNavigateToTestRun(targetId);
-                                    } else if (onNavigateView) {
-                                      onNavigateView('TEST_EXECUTION');
-                                    }
-                                  }}
-                                  style={{
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '8px',
-                                    backgroundColor: '#0284c7',
-                                    color: '#ffffff',
-                                    border: 'none',
-                                    padding: '8px 16px',
-                                    borderRadius: '6px',
-                                    fontSize: '0.82rem',
-                                    fontWeight: 700,
-                                    cursor: 'pointer',
-                                    boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)',
-                                    transition: 'all 0.15s ease'
-                                  }}
-                                  onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
-                                  onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
-                                >
-                                  <Play size={14} fill="#ffffff" />
-                                  <span>Open in Test Execution Console</span>
-                                </button>
-                              )}
+                              {(onNavigateToTestRun || onNavigateView) && (() => {
+                                const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                                const targetId = matchingRun ? matchingRun.id : obj.id;
+                                const consoleTabHandlers = createNewTabHandlers({
+                                  projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',
+                                  view: 'test_execution',
+                                  runId: targetId,
+                                  label: obj.title || `Test Run #${targetId}`
+                                }, () => {
+                                  if (onNavigateToTestRun) {
+                                    onNavigateToTestRun(targetId);
+                                  } else if (onNavigateView) {
+                                    onNavigateView('TEST_EXECUTION');
+                                  }
+                                });
+                                return (
+                                  <button
+                                    type="button"
+                                    {...consoleTabHandlers}
+                                    style={{
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '8px',
+                                      backgroundColor: '#0284c7',
+                                      color: '#ffffff',
+                                      border: 'none',
+                                      padding: '8px 16px',
+                                      borderRadius: '6px',
+                                      fontSize: '0.82rem',
+                                      fontWeight: 700,
+                                      cursor: 'pointer',
+                                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)',
+                                      transition: 'all 0.15s ease'
+                                    }}
+                                    title="Open in Test Execution Console&#10;💡 [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab"
+                                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
+                                    onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
+                                  >
+                                    <Play size={14} fill="#ffffff" />
+                                    <span>Open in Test Execution Console</span>
+                                  </button>
+                                );
+                              })()}
                             </div>
 
                             {(() => {
@@ -2179,40 +2201,51 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     Execution Test Run ready for step-by-step verification.
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => {
+                  {(() => {
+                    const matchingRun = activeObject ? testRuns.find(r => r.id === activeObject.id || r.name === activeObject.title) : null;
+                    const targetId = matchingRun ? matchingRun.id : (activeObject?.id || 0);
+                    const consoleDrawerHandlers = createNewTabHandlers({
+                      projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',
+                      view: 'test_execution',
+                      runId: targetId,
+                      label: activeObject?.title || `Test Run #${targetId}`
+                    }, () => {
                       if (onNavigateToTestRun && activeObject) {
-                        const matchingRun = testRuns.find(r => r.id === activeObject.id || r.name === activeObject.title);
-                        const targetId = matchingRun ? matchingRun.id : activeObject.id;
                         onNavigateToTestRun(targetId);
                       } else if (onNavigateView) {
                         onNavigateView('TEST_EXECUTION');
                       }
-                    }}
-                    style={{
-                      width: '100%',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      gap: '8px',
-                      padding: '8px 14px',
-                      borderRadius: '6px',
-                      backgroundColor: '#0284c7',
-                      color: '#ffffff',
-                      fontSize: '0.82rem',
-                      fontWeight: 700,
-                      border: 'none',
-                      cursor: 'pointer',
-                      boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)',
-                      transition: 'all 0.15s ease'
-                    }}
-                    onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
-                    onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
-                  >
-                    <Play size={14} fill="#ffffff" />
-                    <span>Open in Test Execution Console</span>
-                  </button>
+                    });
+                    return (
+                      <button
+                        type="button"
+                        {...consoleDrawerHandlers}
+                        style={{
+                          width: '100%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '8px',
+                          padding: '8px 14px',
+                          borderRadius: '6px',
+                          backgroundColor: '#0284c7',
+                          color: '#ffffff',
+                          fontSize: '0.82rem',
+                          fontWeight: 700,
+                          border: 'none',
+                          cursor: 'pointer',
+                          boxShadow: '0 2px 6px rgba(2, 132, 199, 0.35)',
+                          transition: 'all 0.15s ease'
+                        }}
+                        title="Open in Test Execution Console&#10;💡 [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab"
+                        onMouseEnter={e => e.currentTarget.style.backgroundColor = '#0369a1'}
+                        onMouseLeave={e => e.currentTarget.style.backgroundColor = '#0284c7'}
+                      >
+                        <Play size={14} fill="#ffffff" />
+                        <span>Open in Test Execution Console</span>
+                      </button>
+                    );
+                  })()}
                 </div>
               )}
 
@@ -3083,10 +3116,19 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
               {onNavigateView && (
                 <button
                   type="button"
-                  onClick={() => {
+                  {...createNewTabHandlers({
+                    projectKey: tracker?.prefix?.split('-')[0]?.toLowerCase() || 'robo',
+                    view: 'test_execution',
+                    runId: createdRunToast.runId,
+                    label: createdRunToast.runName || `Test Run #${createdRunToast.runId}`
+                  }, () => {
                     setCreatedRunToast(null);
-                    onNavigateView('TEST_EXECUTION');
-                  }}
+                    if (onNavigateToTestRun && createdRunToast.runId) {
+                      onNavigateToTestRun(createdRunToast.runId);
+                    } else {
+                      onNavigateView('TEST_EXECUTION');
+                    }
+                  })}
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -3100,6 +3142,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                     border: 'none',
                     cursor: 'pointer'
                   }}
+                  title="Open in Execution Console&#10;💡 [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab"
                 >
                   <Play size={13} />
                   <span>Open in Execution Console</span>

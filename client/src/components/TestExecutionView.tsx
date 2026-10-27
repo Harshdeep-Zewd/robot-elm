@@ -48,6 +48,7 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   const projectRuns = testRuns.filter(r => r.project_id === activeProject?.id);
 
   const [selectedRunId, setSelectedRunId] = useState<number | null>(() => {
+    if (selectedRunIdProp) return selectedRunIdProp;
     return projectRuns.length > 0 ? projectRuns[0].id : null;
   });
   

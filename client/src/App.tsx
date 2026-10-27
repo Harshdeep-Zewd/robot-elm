@@ -552,7 +552,7 @@ export const App: React.FC = () => {
   const [currentScreen, setCurrentScreen] = useState<'PROJECTS_PORTAL' | 'WORKSPACE'>(() => {
     try {
       const params = new URLSearchParams(window.location.search);
-      if (params.get('project') || params.get('tracker') || params.get('object') || params.get('view')) return 'WORKSPACE';
+      if (params.get('project') || params.get('tracker') || params.get('object') || params.get('view') || params.get('runId') || params.get('run')) return 'WORKSPACE';
     } catch (e) {}
     return 'PROJECTS_PORTAL';
   });
@@ -571,6 +571,12 @@ export const App: React.FC = () => {
       if (projParam) {
         const found = loadedProjects.find(p => p.key.toLowerCase() === projParam.toLowerCase() || String(p.id) === projParam);
         if (found) return found.id;
+      }
+      const runParam = params.get('runId') || params.get('run');
+      if (runParam) {
+        const loadedRuns = getInitialData<TestRun[]>('test_runs', INITIAL_TEST_RUNS);
+        const targetRun = loadedRuns.find(r => String(r.id) === runParam);
+        if (targetRun) return targetRun.project_id;
       }
       const objParam = params.get('object');
       if (objParam) {
@@ -738,6 +744,9 @@ export const App: React.FC = () => {
       if (v === 'DASHBOARD' || v === 'TRACKER' || v === 'TRACEABILITY' || v === 'TEST_EXECUTION' || v === 'IMPACT') {
         return v as ViewMode;
       }
+      if (params.get('runId') || params.get('run')) {
+        return 'TEST_EXECUTION';
+      }
       if (params.get('tracker') || params.get('object')) {
         return 'TRACKER';
       }
@@ -746,7 +755,17 @@ export const App: React.FC = () => {
   });
   const [searchQuery, setSearchQuery] = useState('');
   const [impactObjectId, setImpactObjectId] = useState<number | null>(null);
-  const [selectedTestRunId, setSelectedTestRunId] = useState<number | null>(null);
+  const [selectedTestRunId, setSelectedTestRunId] = useState<number | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const runParam = params.get('runId') || params.get('run');
+      if (runParam) {
+        const parsed = Number(runParam);
+        if (!isNaN(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return null;
+  });
 
   // Sync browser Back/Forward navigation with URL
   useEffect(() => {
@@ -759,6 +778,15 @@ export const App: React.FC = () => {
           if (match) {
             setActiveProjectId(match.id);
             setCurrentScreen('WORKSPACE');
+            const v = params.get('view')?.toUpperCase();
+            if (v === 'TEST_EXECUTION' || params.get('runId') || params.get('run')) {
+              setActiveView('TEST_EXECUTION');
+              const runParam = params.get('runId') || params.get('run');
+              if (runParam) {
+                const parsed = Number(runParam);
+                if (!isNaN(parsed)) setSelectedTestRunId(parsed);
+              }
+            }
             return;
           }
         }

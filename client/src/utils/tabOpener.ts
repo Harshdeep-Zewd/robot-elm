@@ -9,12 +9,13 @@ export interface NewTabOptions {
   trackerKey?: string;
   objectId?: number | string;
   objectKey?: string;
+  runId?: number | string;
   label?: string;
 }
 
 /**
  * Builds a clean deep-link URL preserving current account, project,
- * view, tracker, and object parameters.
+ * view, tracker, object, and runId parameters.
  */
 export function buildDeepLink(opts: NewTabOptions): string {
   const url = new URL(window.location.origin + window.location.pathname);
@@ -26,12 +27,13 @@ export function buildDeepLink(opts: NewTabOptions): string {
     url.searchParams.set('account', account.toLowerCase());
   }
 
-  // If opening portal, omit project/tracker/object
+  // If opening portal, omit project/tracker/object/runId
   if (opts.view === 'PORTAL') {
     url.searchParams.delete('project');
     url.searchParams.delete('view');
     url.searchParams.delete('tracker');
     url.searchParams.delete('object');
+    url.searchParams.delete('runId');
     return url.toString();
   }
 
@@ -44,6 +46,14 @@ export function buildDeepLink(opts: NewTabOptions): string {
   // View mode
   if (opts.view) {
     url.searchParams.set('view', opts.view.toLowerCase());
+    if (opts.view.toLowerCase() === 'test_execution' || opts.view.toLowerCase() === 'dashboard') {
+      if (!opts.trackerId && !opts.trackerKey) {
+        url.searchParams.delete('tracker');
+      }
+      if (!opts.objectId && !opts.objectKey) {
+        url.searchParams.delete('object');
+      }
+    }
   }
 
   // Tracker identifier
@@ -58,6 +68,11 @@ export function buildDeepLink(opts: NewTabOptions): string {
     url.searchParams.set('object', String(opts.objectId));
   } else if (opts.objectKey) {
     url.searchParams.set('object', opts.objectKey);
+  }
+
+  // Run identifier (for Test Execution Console deep-linking)
+  if (opts.runId !== undefined && opts.runId !== null) {
+    url.searchParams.set('runId', String(opts.runId));
   }
 
   return url.toString();
