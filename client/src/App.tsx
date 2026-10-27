@@ -505,6 +505,112 @@ const getInitialData = <T,>(key: string, defaultValue: T): T => {
   return defaultValue;
 };
 
+export const isDemoProject = (p: any): boolean => {
+  if (!p) return false;
+  return p.id === DEMO_PROJECT.id || p.id === 100 || (typeof p.key === 'string' && p.key.trim().toUpperCase() === 'DEMO');
+};
+
+export const getNonDemoProjects = (): Project[] => {
+  const loaded = getInitialData<Project[]>('projects', INITIAL_PROJECTS);
+  const cleaned = Array.isArray(loaded)
+    ? loaded.filter(p => !isDemoProject(p))
+    : [];
+
+  for (const initP of INITIAL_PROJECTS) {
+    if (!cleaned.some(p => p.id === initP.id || p.key.toUpperCase() === initP.key.toUpperCase())) {
+      cleaned.push(initP);
+    }
+  }
+  return cleaned.length > 0 ? cleaned : INITIAL_PROJECTS;
+};
+
+export const getNonDemoTrackers = (): Tracker[] => {
+  const rawTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+  const nonDemoTrackers = Array.isArray(rawTrackers)
+    ? rawTrackers.filter(t => t && t.project_id !== DEMO_PROJECT.id && t.project_id !== 100)
+    : [];
+
+  const isRemoved = (t: { key?: string; name?: string }) => {
+    const k = (t.key || '').toUpperCase();
+    const n = (t.name || '').toLowerCase();
+    return (
+      k === 'STS_RR4X' ||
+      k === 'QAD_XNF' ||
+      k === 'RRT' ||
+      n.includes('system test strategy rr4x') ||
+      n.includes('qad tasks (xnf)') ||
+      n.includes('rr tasks')
+    );
+  };
+
+  const sanitized: Tracker[] = nonDemoTrackers
+    .filter(t => !isRemoved(t))
+    .map(t => ({
+      ...t,
+      name: cleanTrackerName(t.name),
+      category: getTrackerCategory(t)
+    }));
+
+  const merged = [...sanitized];
+  const currentProjs = getNonDemoProjects();
+  for (const proj of currentProjs) {
+    const projTrackers = merged.filter(t => t.project_id === proj.id);
+    if (projTrackers.length < CANONICAL_TRACKERS.length) {
+      const canonicalForProj = proj.id === 1 ? buildProject1Trackers() : createProjectTrackers(proj.id, proj.key);
+      for (const ct of canonicalForProj) {
+        const cleanName = cleanTrackerName(ct.name);
+        const alreadyExists = projTrackers.some(
+          t => t.id === ct.id ||
+               t.key.toLowerCase() === ct.key.toLowerCase() ||
+               cleanTrackerName(t.name).toLowerCase() === cleanName.toLowerCase()
+        );
+        if (!alreadyExists) {
+          merged.push({
+            ...ct,
+            name: cleanName,
+            category: getTrackerCategory(ct)
+          });
+        }
+      }
+    }
+  }
+  return merged.length > 0 ? merged : INITIAL_TRACKERS;
+};
+
+export const getNonDemoObjects = (): EngineeringObject[] => {
+  const loaded = getInitialData<EngineeringObject[]>('objects', INITIAL_OBJECTS);
+  const filtered = Array.isArray(loaded)
+    ? loaded.filter(obj => obj && obj.id < 90000 && !String(obj.object_key).startsWith('DEMO-'))
+    : [];
+
+  const merged = [...filtered];
+  for (const initObj of INITIAL_OBJECTS) {
+    if (!merged.some(o => o.id === initObj.id)) {
+      merged.push(initObj);
+    }
+  }
+  return merged.map(obj => {
+    const initObj = INITIAL_OBJECTS.find(io => io.id === obj.id);
+    if (initObj) {
+      return {
+        ...obj,
+        custom_columns: (obj.custom_columns && obj.custom_columns.length > 0) ? obj.custom_columns : initObj.custom_columns,
+        revisions: (obj.revisions && obj.revisions.length > 0) ? obj.revisions : initObj.revisions,
+        version: obj.version > 1 ? obj.version : (initObj.version || obj.version)
+      };
+    }
+    return obj;
+  });
+};
+
+export const getNonDemoTestRuns = (): TestRun[] => {
+  const loaded = getInitialData<TestRun[]>('test_runs', INITIAL_TEST_RUNS);
+  const filtered = Array.isArray(loaded)
+    ? loaded.filter(r => r && r.project_id !== DEMO_PROJECT.id && r.project_id !== 100)
+    : [];
+  return filtered.length > 0 ? filtered : INITIAL_TEST_RUNS;
+};
+
 export const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | null>(() => {
     try {
@@ -559,12 +665,12 @@ export const App: React.FC = () => {
 
   const [projects, setProjects] = useState<Project[]>(() => {
     if (isDemo) return [DEMO_PROJECT];
-    return getInitialData('projects', INITIAL_PROJECTS);
+    return getNonDemoProjects();
   });
   
   const [activeProjectId, setActiveProjectId] = useState<number>(() => {
     if (isDemo) return DEMO_PROJECT.id;
-    const loadedProjects = getInitialData<Project[]>('projects', INITIAL_PROJECTS);
+    const loadedProjects = getNonDemoProjects();
     try {
       const params = new URLSearchParams(window.location.search);
       const projParam = params.get('project');
@@ -574,16 +680,16 @@ export const App: React.FC = () => {
       }
       const runParam = params.get('runId') || params.get('run');
       if (runParam) {
-        const loadedRuns = getInitialData<TestRun[]>('test_runs', INITIAL_TEST_RUNS);
+        const loadedRuns = getNonDemoTestRuns();
         const targetRun = loadedRuns.find(r => String(r.id) === runParam);
-        if (targetRun) return targetRun.project_id;
+        if (targetRun && targetRun.project_id !== DEMO_PROJECT.id && targetRun.project_id !== 100) return targetRun.project_id;
       }
       const objParam = params.get('object');
       if (objParam) {
-        const loadedObjects = getInitialData<EngineeringObject[]>('objects', INITIAL_OBJECTS);
+        const loadedObjects = getNonDemoObjects();
         const obj = loadedObjects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
         if (obj) {
-          const loadedTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+          const loadedTrackers = getNonDemoTrackers();
           const trk = loadedTrackers.find(t => t.id === obj.tracker_id);
           if (trk) {
             const foundProj = loadedProjects.find(p => p.id === trk.project_id);
@@ -593,7 +699,7 @@ export const App: React.FC = () => {
       }
       const trkParam = params.get('tracker');
       if (trkParam) {
-        const loadedTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+        const loadedTrackers = getNonDemoTrackers();
         const trk = loadedTrackers.find(t => String(t.id) === trkParam || t.key.toLowerCase() === trkParam.toLowerCase());
         if (trk) {
           const foundProj = loadedProjects.find(p => p.id === trk.project_id);
@@ -602,7 +708,7 @@ export const App: React.FC = () => {
       }
     } catch (e) {}
     const savedId = getInitialData<number | null>('active_project_id', null);
-    if (savedId && loadedProjects.some(p => p.id === savedId)) {
+    if (savedId && savedId !== DEMO_PROJECT.id && savedId !== 100 && loadedProjects.some(p => p.id === savedId)) {
       return savedId;
     }
     return loadedProjects[0]?.id || INITIAL_PROJECTS[0].id;
@@ -610,64 +716,16 @@ export const App: React.FC = () => {
 
   const [allTrackers, setAllTrackers] = useState<Tracker[]>(() => {
     if (isDemo) return initialDemoBundle.demoTrackers;
-    const rawTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
-    const loadedProjects = getInitialData<Project[]>('projects', INITIAL_PROJECTS);
-
-    const isRemoved = (t: { key?: string; name?: string }) => {
-      const k = (t.key || '').toUpperCase();
-      const n = (t.name || '').toLowerCase();
-      return (
-        k === 'STS_RR4X' ||
-        k === 'QAD_XNF' ||
-        k === 'RRT' ||
-        n.includes('system test strategy rr4x') ||
-        n.includes('qad tasks (xnf)') ||
-        n.includes('rr tasks')
-      );
-    };
-
-    // Sanitize any existing stored trackers to remove deleted trackers, strip serial numbers, and assign canonical category
-    const sanitized: Tracker[] = rawTrackers
-      .filter(t => !isRemoved(t))
-      .map(t => ({
-        ...t,
-        name: cleanTrackerName(t.name),
-        category: getTrackerCategory(t)
-      }));
-
-    // Ensure every project has all independent trackers
-    const merged = [...sanitized].filter(t => !isRemoved(t));
-    for (const proj of loadedProjects) {
-      const projTrackers = merged.filter(t => t.project_id === proj.id);
-      if (projTrackers.length < CANONICAL_TRACKERS.length) {
-        const canonicalForProj = proj.id === 1 ? buildProject1Trackers() : createProjectTrackers(proj.id, proj.key);
-        for (const ct of canonicalForProj) {
-          const cleanName = cleanTrackerName(ct.name);
-          const alreadyExists = projTrackers.some(
-            t => t.id === ct.id ||
-                 t.key.toLowerCase() === ct.key.toLowerCase() ||
-                 cleanTrackerName(t.name).toLowerCase() === cleanName.toLowerCase()
-          );
-          if (!alreadyExists) {
-            merged.push({
-              ...ct,
-              name: cleanName,
-              category: getTrackerCategory(ct)
-            });
-          }
-        }
-      }
-    }
-    return merged;
+    return getNonDemoTrackers();
   });
   
   const [selectedTrackerId, setSelectedTrackerId] = useState<number | null>(() => {
-    const loadedTrackers = isDemo ? initialDemoBundle.demoTrackers : getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+    const loadedTrackers = isDemo ? initialDemoBundle.demoTrackers : getNonDemoTrackers();
     try {
       const params = new URLSearchParams(window.location.search);
       const objParam = params.get('object');
       if (objParam) {
-        const loadedObjects = isDemo ? initialDemoBundle.demoObjects : getInitialData<EngineeringObject[]>('objects', INITIAL_OBJECTS);
+        const loadedObjects = isDemo ? initialDemoBundle.demoObjects : getNonDemoObjects();
         const foundObj = loadedObjects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
         if (foundObj) {
           return foundObj.tracker_id;
@@ -699,19 +757,7 @@ export const App: React.FC = () => {
 
   const [allObjects, setAllObjects] = useState<EngineeringObject[]>(() => {
     if (isDemo) return initialDemoBundle.demoObjects;
-    const loaded = getInitialData<EngineeringObject[]>('objects', INITIAL_OBJECTS);
-    return loaded.map(obj => {
-      const initObj = INITIAL_OBJECTS.find(io => io.id === obj.id);
-      if (initObj) {
-        return {
-          ...obj,
-          custom_columns: (obj.custom_columns && obj.custom_columns.length > 0) ? obj.custom_columns : initObj.custom_columns,
-          revisions: (obj.revisions && obj.revisions.length > 0) ? obj.revisions : initObj.revisions,
-          version: obj.version > 1 ? obj.version : (initObj.version || obj.version)
-        };
-      }
-      return obj;
-    });
+    return getNonDemoObjects();
   });
 
   const [relationships, setRelationships] = useState<Relationship[]>(() => {
@@ -730,7 +776,8 @@ export const App: React.FC = () => {
   });
 
   const [testRuns, setTestRuns] = useState<TestRun[]>(() => {
-    return getInitialData('test_runs', INITIAL_TEST_RUNS);
+    if (isDemo) return [];
+    return getNonDemoTestRuns();
   });
 
   const [testRunDetailsMap, setTestRunDetailsMap] = useState<Record<number, any>>(() => {
@@ -840,10 +887,25 @@ export const App: React.FC = () => {
       url.searchParams.delete('view');
       url.searchParams.delete('tracker');
       url.searchParams.delete('object');
+      url.searchParams.delete('runId');
+      url.searchParams.delete('run');
       window.history.replaceState({}, '', url.pathname);
     } catch (e) {}
     setCurrentUser(null);
     setCurrentScreen('PROJECTS_PORTAL');
+    const cleanProjects = getNonDemoProjects();
+    const cleanTrackers = getNonDemoTrackers();
+    setProjects(cleanProjects);
+    setActiveProjectId(cleanProjects[0]?.id || 1);
+    setAllTrackers(cleanTrackers);
+    setAllFolders(getInitialData('folders', INITIAL_FOLDERS));
+    setAllObjects(getNonDemoObjects());
+    setTestSteps(getInitialData('test_steps', INITIAL_TEST_STEPS));
+    setArtifacts(getInitialData('artifacts', INITIAL_ARTIFACTS));
+    setRelationships(getInitialData('relationships', INITIAL_RELATIONSHIPS));
+    setTestRuns(getNonDemoTestRuns());
+    setSelectedTrackerId(cleanTrackers[0]?.id || 1);
+    setActiveView('DASHBOARD');
   };
 
   const handleLoginSuccess = (user: User) => {
@@ -875,19 +937,26 @@ export const App: React.FC = () => {
       } catch (e) {}
     } else {
       // Zewd
-      const loadedProjects = getInitialData<Project[]>('projects', INITIAL_PROJECTS);
-      const loadedTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
+      const loadedProjects = getNonDemoProjects();
+      const loadedTrackers = getNonDemoTrackers();
+      const loadedObjects = getNonDemoObjects();
+      const loadedTestRuns = getNonDemoTestRuns();
       setProjects(loadedProjects);
       setActiveProjectId(loadedProjects[0]?.id || 1);
       setAllTrackers(loadedTrackers);
       setAllFolders(getInitialData('folders', INITIAL_FOLDERS));
-      setAllObjects(getInitialData('objects', INITIAL_OBJECTS));
+      setAllObjects(loadedObjects);
       setTestSteps(getInitialData('test_steps', INITIAL_TEST_STEPS));
       setArtifacts(getInitialData('artifacts', INITIAL_ARTIFACTS));
       setRelationships(getInitialData('relationships', INITIAL_RELATIONSHIPS));
+      setTestRuns(loadedTestRuns);
       setSelectedTrackerId(loadedTrackers[0]?.id || 1);
       setActiveView('DASHBOARD');
       setCurrentScreen('PROJECTS_PORTAL');
+      try {
+        localStorage.setItem('roboserv_elm_projects', JSON.stringify(loadedProjects));
+        localStorage.setItem('roboserv_elm_active_project_id', JSON.stringify(loadedProjects[0]?.id || 1));
+      } catch (e) {}
       try {
         const url = new URL(window.location.href);
         url.searchParams.set('account', 'zewd');
@@ -903,14 +972,16 @@ export const App: React.FC = () => {
   };
 
   const refreshAuthData = () => {
-    setProjects(getInitialData('projects', INITIAL_PROJECTS));
-    setAllTrackers(getInitialData('trackers', INITIAL_TRACKERS));
-    setTestRuns(getInitialData('test_runs', INITIAL_TEST_RUNS));
+    setProjects(getNonDemoProjects());
+    setAllTrackers(getNonDemoTrackers());
+    setTestRuns(getNonDemoTestRuns());
     setTestRunDetailsMap(getInitialData('test_run_details', INITIAL_TEST_RUN_DETAILS));
   };
 
   // Derived state: Active Project & Active Trackers
-  const visibleProjects = projects;
+  const nonDemoProjects = projects.filter(p => !isDemoProject(p));
+  const safeNonDemoProjects = nonDemoProjects.length > 0 ? nonDemoProjects : INITIAL_PROJECTS;
+  const visibleProjects = isDemo ? [DEMO_PROJECT] : safeNonDemoProjects;
   const activeProject = visibleProjects.find(p => p.id === activeProjectId) || visibleProjects[0] || INITIAL_PROJECTS[0];
 
   const currentTrackers = allTrackers
@@ -931,19 +1002,60 @@ export const App: React.FC = () => {
 
   const selectedTracker = currentTrackers.find(t => t.id === selectedTrackerId) || currentTrackers[0] || null;
 
+  // Self-healing effect: clean up any contaminated localStorage state for non-demo accounts
+  useEffect(() => {
+    if (isDemo) return;
+    try {
+      const rawStored = localStorage.getItem('roboserv_elm_projects');
+      if (rawStored) {
+        const parsed = JSON.parse(rawStored);
+        if (Array.isArray(parsed) && (parsed.some(isDemoProject) || parsed.length === 0)) {
+          const cleaned = getNonDemoProjects();
+          localStorage.setItem('roboserv_elm_projects', JSON.stringify(cleaned));
+          setProjects(cleaned);
+        }
+      }
+      const rawActive = localStorage.getItem('roboserv_elm_active_project_id');
+      if (rawActive && (Number(rawActive) === DEMO_PROJECT.id || Number(rawActive) === 100)) {
+        localStorage.setItem('roboserv_elm_active_project_id', '1');
+        setActiveProjectId(1);
+      }
+      const rawTrackers = localStorage.getItem('roboserv_elm_trackers');
+      if (rawTrackers) {
+        const parsedT = JSON.parse(rawTrackers);
+        if (Array.isArray(parsedT) && parsedT.some(t => t.project_id === DEMO_PROJECT.id || t.project_id === 100)) {
+          const cleanedT = getNonDemoTrackers();
+          localStorage.setItem('roboserv_elm_trackers', JSON.stringify(cleanedT));
+          setAllTrackers(cleanedT);
+        }
+      }
+      if (projects.some(isDemoProject)) {
+        setProjects(getNonDemoProjects());
+      }
+    } catch (e) {
+      console.error('Self-healing storage check failed:', e);
+    }
+  }, [isDemo]);
+
   // Auto-persist all state changes directly to localStorage ONLY for non-demo users (e.g. Zewd)
   // Demo account changes are strictly in-memory and discarded upon reload
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
-    localStorage.setItem('roboserv_elm_projects', JSON.stringify(projects));
+    const toSave = projects.filter(p => !isDemoProject(p));
+    if (toSave.length > 0) {
+      localStorage.setItem('roboserv_elm_projects', JSON.stringify(toSave));
+    }
   }, [projects, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
-    localStorage.setItem('roboserv_elm_active_project_id', JSON.stringify(activeProjectId));
+    if (activeProjectId !== DEMO_PROJECT.id && activeProjectId !== 100) {
+      localStorage.setItem('roboserv_elm_active_project_id', JSON.stringify(activeProjectId));
+    }
   }, [activeProjectId, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
-    localStorage.setItem('roboserv_elm_trackers', JSON.stringify(allTrackers));
+    const toSave = allTrackers.filter(t => t.project_id !== DEMO_PROJECT.id && t.project_id !== 100);
+    localStorage.setItem('roboserv_elm_trackers', JSON.stringify(toSave));
   }, [allTrackers, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
@@ -955,7 +1067,8 @@ export const App: React.FC = () => {
   }, [allFolders, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
-    localStorage.setItem('roboserv_elm_objects', JSON.stringify(allObjects));
+    const toSave = allObjects.filter(o => o.id < 90000 && !String(o.object_key).startsWith('DEMO-'));
+    localStorage.setItem('roboserv_elm_objects', JSON.stringify(toSave));
   }, [allObjects, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
@@ -971,7 +1084,8 @@ export const App: React.FC = () => {
   }, [artifacts, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
-    localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(testRuns));
+    const toSave = testRuns.filter(r => r.project_id !== DEMO_PROJECT.id && r.project_id !== 100);
+    localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(toSave));
   }, [testRuns, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
