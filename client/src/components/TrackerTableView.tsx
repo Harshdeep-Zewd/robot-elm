@@ -1182,7 +1182,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {/* Status Badge (Updated in Yellow Box) */}
                         {(() => {
-                          const matchingRun = isTestRunTracker ? testRuns.find(r => r.id === obj.id || r.name === obj.title) : null;
+                          const matchingRun = isTestRunTracker ? testRuns.find(r => r.id === obj.id) : null;
                           const effectiveStatus = (isTestRunTracker && matchingRun?.overall_status) ? matchingRun.overall_status : (obj.status || 'NOT_RUN');
                           const norm = (effectiveStatus || '').toUpperCase();
                           
@@ -1254,7 +1254,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
 
                         {/* Quick Open in Console for Test Runs */}
                         {isTestRunTracker && (onNavigateToTestRun || onNavigateView) && (() => {
-                          const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                          const matchingRun = testRuns.find(r => r.id === obj.id);
                           const targetId = matchingRun ? matchingRun.id : obj.id;
                           const runTabHandlers = createNewTabHandlers({
                             projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',
@@ -1885,7 +1885,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                   Execution Test Run
                                 </span>
                                 {(() => {
-                                  const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                                  const matchingRun = testRuns.find(r => r.id === obj.id);
                                   const effectiveStatus = matchingRun?.overall_status || obj.status || 'NOT_RUN';
                                   return (
                                     <span className={`badge badge-${effectiveStatus.toLowerCase().replace(/_/g, '-')}`}>
@@ -1896,7 +1896,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               </div>
 
                               {(onNavigateToTestRun || onNavigateView) && (() => {
-                                const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                                const matchingRun = testRuns.find(r => r.id === obj.id);
                                 const targetId = matchingRun ? matchingRun.id : obj.id;
                                 const consoleTabHandlers = createNewTabHandlers({
                                   projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',
@@ -2187,7 +2187,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   borderRadius: '8px'
                 }}>
                   {(() => {
-                    const matchingRun = activeObject ? testRuns.find(r => r.id === activeObject.id || r.name === activeObject.title) : null;
+                    const matchingRun = activeObject ? testRuns.find(r => r.id === activeObject.id) : null;
                     const effectiveStatus = matchingRun?.overall_status || activeObject?.status || 'NOT_RUN';
                     return (
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
@@ -2202,7 +2202,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                     Execution Test Run ready for step-by-step verification.
                   </div>
                   {(() => {
-                    const matchingRun = activeObject ? testRuns.find(r => r.id === activeObject.id || r.name === activeObject.title) : null;
+                    const matchingRun = activeObject ? testRuns.find(r => r.id === activeObject.id) : null;
                     const targetId = matchingRun ? matchingRun.id : (activeObject?.id || 0);
                     const consoleDrawerHandlers = createNewTabHandlers({
                       projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',

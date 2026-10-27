@@ -479,7 +479,7 @@ const INITIAL_TEST_RUN_DETAILS: Record<number, any> = {
     ]
   }
 };
-INITIAL_TEST_RUN_DETAILS[10] = { ...INITIAL_TEST_RUN_DETAILS[1], id: 10 };
+INITIAL_TEST_RUN_DETAILS[10] = JSON.parse(JSON.stringify({ ...INITIAL_TEST_RUN_DETAILS[1], id: 10 }));
 
 
 const ZEWD_USER: User = {
@@ -998,12 +998,17 @@ export const App: React.FC = () => {
     const sqtrObjects = newObjects.filter(o => o.tracker_id === sqtrTracker.id);
 
     projectRuns.forEach((run) => {
-      const matchingObj = sqtrObjects.find(o =>
-        o.id === run.id ||
-        o.title === run.name ||
-        o.title === `Test Run for ${run.test_set_title}` ||
-        (run.name && o.title?.toLowerCase() === run.name.toLowerCase())
-      );
+      // Reconcile status from its own detail map if available
+      const detail = testRunDetailsMap[run.id];
+      if (detail && detail.overall_status) {
+        if (run.overall_status !== detail.overall_status) {
+          run.overall_status = detail.overall_status;
+          runsChanged = true;
+        }
+      }
+
+      // Match strictly by unique ID to prevent cross-contamination between different test runs
+      const matchingObj = sqtrObjects.find(o => o.id === run.id);
       if (!matchingObj) {
         const seq = sqtrObjects.length + 1;
         const prefix = sqtrTracker.prefix || `${activeProject?.key || 'ROBO'}-SQTR-`;
@@ -1035,7 +1040,7 @@ export const App: React.FC = () => {
         newObjects.unshift(newObj);
         objectsChanged = true;
       } else {
-        // Synchronize status if run execution has been updated!
+        // Synchronize status strictly for this specific run ID!
         if (run.overall_status && matchingObj.status !== run.overall_status) {
           matchingObj.status = run.overall_status as any;
           matchingObj.updated_at = new Date().toISOString();
@@ -1044,9 +1049,9 @@ export const App: React.FC = () => {
       }
     });
 
-    // 2. Ensure every SQTR EngineeringObject has a corresponding TestRun in testRuns
+    // 2. Ensure every SQTR EngineeringObject has a corresponding TestRun in testRuns (strictly by ID)
     sqtrObjects.forEach(obj => {
-      const matchingRun = newRuns.find(r => r.id === obj.id || r.name === obj.title);
+      const matchingRun = newRuns.find(r => r.id === obj.id);
       if (!matchingRun) {
         const newRun: TestRun = {
           id: obj.id,
@@ -1065,7 +1070,7 @@ export const App: React.FC = () => {
         newRuns.unshift(newRun);
         runsChanged = true;
       } else {
-        // Synchronize status if obj status is newer
+        // Synchronize status strictly for this specific run ID!
         if (obj.status && obj.status !== 'NOT_RUN' && matchingRun.overall_status !== obj.status) {
           matchingRun.overall_status = obj.status as any;
           runsChanged = true;
@@ -1423,26 +1428,26 @@ export const App: React.FC = () => {
   };
 
   const handleSaveTestRunResults = (runId: number, newStatus: string, updatedDetail?: any) => {
-    // 1. Update testRunDetailsMap & save to localStorage
+    // 1. Update testRunDetailsMap & save to localStorage strictly for this runId
     if (updatedDetail) {
       setTestRunDetailsMap(prev => {
-        const next = { ...prev, [runId]: updatedDetail };
+        const next = { ...prev, [runId]: { ...updatedDetail, id: runId, overall_status: newStatus } };
         try { localStorage.setItem('roboserv_elm_test_run_details', JSON.stringify(next)); } catch (e) {}
         return next;
       });
     }
 
-    // 2. Update testRuns & save to localStorage
+    // 2. Update testRuns & save to localStorage strictly by ID
     setTestRuns(prev => {
-      const next = prev.map(r => (r.id === runId || (updatedDetail && r.name === updatedDetail.name)) ? { ...r, overall_status: newStatus as any } : r);
+      const next = prev.map(r => r.id === runId ? { ...r, overall_status: newStatus as any } : r);
       try { localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(next)); } catch (e) {}
       return next;
     });
 
-    // 3. Update allObjects (the SQTR tracker / yellow box) & save to localStorage
+    // 3. Update allObjects (the SQTR tracker / yellow box) strictly by ID
     setAllObjects(prev => {
       const next = prev.map(obj => {
-        if (obj.id === runId || (updatedDetail && (obj.title === updatedDetail.name || obj.title === `Test Run for ${updatedDetail.test_set_title}`))) {
+        if (obj.id === runId) {
           return {
             ...obj,
             status: newStatus as any,
@@ -1463,7 +1468,13 @@ export const App: React.FC = () => {
     const folder = allFolders.find(f => f.id === testSet.folder_id);
     const folderName = testSet.folder_name || folder?.name || 'General';
     const testSetName = testSet.title?.trim() || testSet.object_key;
-    const runName = `Test Run for ${testSetName}`;
+    
+    // Distinguish multiple runs from the same test set
+    const existingRunsForSet = relationships.filter(rel => rel.target_id === testSet.id && rel.relationship_type === 'EXECUTED_FROM');
+    const runNumber = existingRunsForSet.length + 1;
+    const runName = existingRunsForSet.length === 0
+      ? `Test Run for ${testSetName}`
+      : `Test Run for ${testSetName} #${runNumber}`;
 
     // 2. Find single test run tracker for current project (SQTR prioritized)
     let testRunTracker = currentTrackers.find(t =>
@@ -1532,19 +1543,19 @@ export const App: React.FC = () => {
       started_at: new Date().toISOString()
     };
 
-    // Map caseResults
+    // Map caseResults strictly with unique IDs isolated for this specific test run
     const caseResults = (includedCases.length > 0 ? includedCases : [testSet]).map(tc => {
       const tcSteps = testSteps.filter(s => s.test_case_id === tc.id);
       return {
-        id: Date.now() + tc.id,
+        id: newRunId + tc.id,
         test_run_id: newRunId,
         test_case_id: tc.id,
         case_key: tc.object_key,
         case_title: tc.title,
         status: 'NOT_RUN' as const,
         steps: tcSteps.length > 0 ? tcSteps.map(s => ({
-          id: s.id * 100 + newRunId,
-          test_run_result_id: Date.now() + tc.id,
+          id: s.id * 100000 + (newRunId % 100000),
+          test_run_result_id: newRunId + tc.id,
           test_step_id: s.id,
           step_number: s.step_number,
           action: s.action,
@@ -1553,8 +1564,8 @@ export const App: React.FC = () => {
           actual_result: ''
         })) : [
           {
-            id: Date.now() + 500,
-            test_run_result_id: Date.now() + tc.id,
+            id: newRunId + 500,
+            test_run_result_id: newRunId + tc.id,
             test_step_id: 1,
             step_number: 1,
             action: `Execute verification procedure for ${tc.title}`,
@@ -1578,10 +1589,14 @@ export const App: React.FC = () => {
       caseResults
     };
 
-    // Update states
+    // Update states and persist details immediately to avoid cross-run state pollution
     setAllObjects(prev => [newRunObj, ...prev]);
     setTestRuns(prev => [newTestRun, ...prev]);
-    setTestRunDetailsMap(prev => ({ ...prev, [newRunId]: detailObj }));
+    setTestRunDetailsMap(prev => {
+      const next = { ...prev, [newRunId]: detailObj };
+      try { localStorage.setItem('roboserv_elm_test_run_details', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
 
     // Relationship: new run object EXECUTED_FROM test set
     const newRel: Relationship = {

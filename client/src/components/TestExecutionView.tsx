@@ -123,58 +123,68 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   const buildMockRunDetail = (runId: number) => {
     const targetRun = testRuns.find(r => r.id === runId);
     
-    // Find test cases included in the test set via relationships or default
+    // Resolve target test set ID directly or via EXECUTED_FROM relationship
+    let targetSetId = targetRun?.test_set_id;
+    if (!targetSetId) {
+      const execRel = relationships.find(r => r.source_id === runId && r.relationship_type === 'EXECUTED_FROM');
+      if (execRel) targetSetId = execRel.target_id;
+    }
+
+    // Find test cases included in this specific test set
     let includedCases = availableTestCases;
-    if (targetRun?.test_set_id) {
+    if (targetSetId) {
       const relCases = relationships
-        .filter(r => r.target_id === targetRun.test_set_id && r.relationship_type === 'INCLUDED_IN')
+        .filter(r => r.target_id === targetSetId && r.relationship_type === 'INCLUDED_IN')
         .map(r => allObjects.find(o => o.id === r.source_id))
         .filter(Boolean) as EngineeringObject[];
       if (relCases.length > 0) includedCases = relCases;
     }
 
+    // Ensure completely isolated and independent caseResults for this runId
     const caseResults = includedCases.map(tc => {
       const tcSteps = testSteps.filter(s => s.test_case_id === tc.id);
       return {
-        id: Date.now() + tc.id,
+        id: runId * 10000 + tc.id,
         test_run_id: runId,
         test_case_id: tc.id,
         case_key: tc.object_key,
         case_title: tc.title,
-        status: 'PASS',
+        status: (targetRun?.overall_status === 'PASS' ? 'PASS' : 'NOT_RUN') as any,
         steps: tcSteps.length > 0 ? tcSteps.map(s => ({
-          id: s.id * 100 + runId,
-          test_run_result_id: Date.now() + tc.id,
+          id: runId * 100000 + s.id,
+          test_run_result_id: runId * 10000 + tc.id,
           test_step_id: s.id,
           step_number: s.step_number,
           action: s.action,
           expected_result: s.expected_result,
-          status: 'PASS',
-          actual_result: 'Verified output matching expected result.'
+          status: (targetRun?.overall_status === 'PASS' ? 'PASS' : 'NOT_RUN') as any,
+          actual_result: targetRun?.overall_status === 'PASS' ? 'Verified output matching expected result.' : ''
         })) : [
           {
-            id: Date.now() + 500,
-            test_run_result_id: Date.now() + tc.id,
+            id: runId * 100000 + 1,
+            test_run_result_id: runId * 10000 + tc.id,
             test_step_id: 1,
             step_number: 1,
             action: `Execute verification procedure for ${tc.title}`,
             expected_result: `System operates in compliance with ${tc.object_key}`,
-            status: 'PASS',
-            actual_result: 'Verified output matching specification.'
+            status: (targetRun?.overall_status === 'PASS' ? 'PASS' : 'NOT_RUN') as any,
+            actual_result: targetRun?.overall_status === 'PASS' ? 'Verified output matching specification.' : ''
           }
         ]
       };
     });
 
+    const targetSetObj = targetSetId ? allObjects.find(o => o.id === targetSetId) : null;
+
     const detailObj = {
       id: runId,
       name: targetRun?.name || `Test Run #${runId}`,
-      test_set_key: targetRun?.test_set_key || (availableTestSets[0]?.object_key || 'TST-SET-001'),
-      test_set_title: targetRun?.test_set_title || (availableTestSets[0]?.title || 'System Test Set'),
+      test_set_key: targetRun?.test_set_key || targetSetObj?.object_key || (availableTestSets[0]?.object_key || 'TST-SET-001'),
+      test_set_title: targetRun?.test_set_title || targetSetObj?.title || (availableTestSets[0]?.title || 'System Test Set'),
       config_name: targetRun?.config_name || `${activeProject?.key || 'PROJ'} Configuration`,
       software_version: targetRun?.software_version || 'v1.0.0',
       tester_name: targetRun?.tester_name || currentUser?.name || 'Zewd',
-      overall_status: targetRun?.overall_status || 'PASS',
+      overall_status: targetRun?.overall_status || 'NOT_RUN',
       caseResults
     };
 
