@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Play, CheckCircle2, XCircle, AlertOctagon, HelpCircle, Plus, Activity, Layers, User, Settings, Check, X, ChevronDown, ChevronUp, ChevronRight, ArrowLeft } from 'lucide-react';
+import { Play, CheckCircle2, XCircle, AlertOctagon, HelpCircle, Plus, Activity, Layers, User, Settings, Check, X, ChevronDown, ChevronUp, ChevronRight, ArrowLeft, Save } from 'lucide-react';
 import { TestRun, Project, Tracker, EngineeringObject, TestStep, Relationship, User as UserType } from '../types/elm';
 import { createNewTabHandlers } from '../utils/tabOpener';
 
@@ -19,6 +19,7 @@ interface TestExecutionViewProps {
   onNavigateView?: (view: any) => void;
   selectedRunIdProp?: number | null;
   onSelectRunIdProp?: (id: number | null) => void;
+  onSaveResults?: (runId: number, status: string, detail: any) => void;
 }
 
 export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
@@ -36,7 +37,8 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   onBackToSQTR,
   onNavigateView,
   selectedRunIdProp,
-  onSelectRunIdProp
+  onSelectRunIdProp,
+  onSaveResults
 }) => {
   // Filter objects and runs strictly for the current active project
   const currentTrackerIds = currentTrackers.map(t => t.id);
@@ -56,6 +58,11 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
   const [testerName, setTesterName] = useState(currentUser?.name || 'Zewd');
   const [configName, setConfigName] = useState(`${activeProject?.key || 'PROJ'} Hardware Config Rev 1`);
   const [swVersion, setSwVersion] = useState('v1.0.0-release');
+
+  // Save Execution Results State
+  const [saveState, setSaveState] = useState<'IDLE' | 'SAVING' | 'SAVED'>('IDLE');
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [showToast, setShowToast] = useState(false);
 
   // Test Case Dropdown & Expansion State
   const [expandedCaseIds, setExpandedCaseIds] = useState<Set<number>>(new Set());
@@ -328,6 +335,44 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
     if (onUpdateTestRuns) {
       onUpdateTestRuns(prev => prev.map(r => r.id === selectedRunId ? { ...r, overall_status: newOverallStatus as any } : r));
     }
+    if (onSaveResults) {
+      onSaveResults(selectedRunId, newOverallStatus, updatedDetail);
+    }
+  };
+
+  const handleSaveResults = () => {
+    if (!selectedRunId || !activeRunDetail) return;
+    setSaveState('SAVING');
+
+    const statusToSave = activeRunDetail.overall_status || 'PASS';
+
+    // 1. Update Test Runs
+    if (onUpdateTestRuns) {
+      onUpdateTestRuns(prev => prev.map(r => r.id === selectedRunId ? { ...r, overall_status: statusToSave as any } : r));
+    }
+
+    // 2. Update Details Map
+    if (onUpdateRunDetailsMap) {
+      onUpdateRunDetailsMap(prev => ({ ...prev, [selectedRunId]: activeRunDetail }));
+    }
+
+    // 3. Update SQTR Tracker Object (The Yellow Box in SQTR Dashboard!)
+    if (onSaveResults) {
+      onSaveResults(selectedRunId, statusToSave, activeRunDetail);
+    }
+
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setLastSavedAt(timeStr);
+    setSaveState('SAVED');
+    setShowToast(true);
+
+    setTimeout(() => {
+      setSaveState('IDLE');
+    }, 3500);
+
+    setTimeout(() => {
+      setShowToast(false);
+    }, 4500);
   };
 
   const activeRunDetail = selectedRunId ? testRunDetailsMap[selectedRunId] : null;
@@ -436,11 +481,36 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
         </div>
 
         {activeRunDetail && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>Overall Status:</span>
-            <span className={`badge badge-${(activeRunDetail.overall_status || 'PASS').toLowerCase().replace(/_/g, '-')}`} style={{ fontSize: '0.8rem', padding: '4px 10px' }}>
+            <span className={`badge badge-${(activeRunDetail.overall_status || 'PASS').toLowerCase().replace(/_/g, '-')}`} style={{ fontSize: '0.82rem', padding: '4px 10px' }}>
               {activeRunDetail.overall_status || 'PASS'}
             </span>
+
+            {/* Prominent Save Execution Results Button */}
+            <button
+              type="button"
+              onClick={handleSaveResults}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '7px',
+                backgroundColor: saveState === 'SAVED' ? '#10b981' : '#0284c7',
+                color: '#ffffff',
+                border: 'none',
+                padding: '7px 16px',
+                borderRadius: '6px',
+                fontSize: '0.82rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                boxShadow: saveState === 'SAVED' ? '0 2px 10px rgba(16, 185, 129, 0.45)' : '0 2px 10px rgba(2, 132, 199, 0.35)',
+                transition: 'all 0.2s ease'
+              }}
+              title="Save execution results and update the status in the System Qualification Test Runs Dashboard (Yellow Box)"
+            >
+              {saveState === 'SAVED' ? <Check size={15} /> : <Save size={15} />}
+              <span>{saveState === 'SAVED' ? 'Results Saved ✓' : 'Save Results'}</span>
+            </button>
           </div>
         )}
       </div>
@@ -451,19 +521,50 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
           <div>
             {/* Header info card */}
             <div style={{ backgroundColor: 'var(--bg-card)', padding: '20px', borderRadius: '10px', border: '1px solid var(--border-color)', marginBottom: '24px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
                 <div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)' }}>{activeRunDetail.name}</h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                    <h2 style={{ fontSize: '1.4rem', fontWeight: 700, color: 'var(--text-main)', margin: 0 }}>{activeRunDetail.name}</h2>
                     <span className={`badge badge-${(activeRunDetail.overall_status || 'PASS').toLowerCase().replace(/_/g, '-')}`} style={{ fontSize: '0.85rem' }}>
                       {activeRunDetail.overall_status || 'PASS'}
                     </span>
                   </div>
 
-                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginTop: '6px', display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
                     <span>Target Test Set:</span>
                     <span style={{ color: 'var(--accent-cyan)', fontWeight: 700 }} className="mono">{activeRunDetail.test_set_key}</span>
                     <span>• {activeRunDetail.test_set_title}</span>
+                  </div>
+
+                  {/* Quick Save Option in Header Card */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '12px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      onClick={handleSaveResults}
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        backgroundColor: saveState === 'SAVED' ? 'rgba(16, 185, 129, 0.2)' : 'rgba(56, 189, 248, 0.12)',
+                        border: `1px solid ${saveState === 'SAVED' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(56, 189, 248, 0.35)'}`,
+                        color: saveState === 'SAVED' ? 'var(--accent-emerald)' : 'var(--accent-cyan)',
+                        padding: '6px 14px',
+                        borderRadius: '6px',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {saveState === 'SAVED' ? <Check size={14} /> : <Save size={14} />}
+                      <span>{saveState === 'SAVED' ? 'Saved to SQTR Dashboard ✓' : 'Save Execution Results'}</span>
+                    </button>
+
+                    {lastSavedAt && (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Last saved: <strong style={{ color: 'var(--text-main)' }}>{lastSavedAt}</strong>
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -841,6 +942,34 @@ export const TestExecutionView: React.FC<TestExecutionViewProps> = ({
           </div>
         )}
       </div>
+
+      {/* Toast Notification when results are saved */}
+      {showToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          right: '24px',
+          backgroundColor: 'var(--bg-card)',
+          border: '1px solid rgba(16, 185, 129, 0.6)',
+          padding: '14px 22px',
+          borderRadius: '8px',
+          boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          zIndex: 1000
+        }}>
+          <CheckCircle2 size={22} color="var(--accent-emerald)" />
+          <div>
+            <div style={{ fontSize: '0.88rem', fontWeight: 700, color: 'var(--text-main)' }}>
+              Execution Results Saved!
+            </div>
+            <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+              Status updated to <strong style={{ color: activeRunDetail?.overall_status === 'PASS' ? 'var(--accent-emerald)' : activeRunDetail?.overall_status === 'FAIL' ? 'var(--accent-rose)' : 'var(--accent-amber)' }}>{activeRunDetail?.overall_status}</strong> in System Qualification Test Runs Dashboard.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* New Test Run Modal */}
       {showModal && (

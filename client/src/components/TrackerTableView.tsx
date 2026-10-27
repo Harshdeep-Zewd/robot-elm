@@ -1180,23 +1180,52 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                       </div>
 
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {/* Status Badge */}
-                        <span style={{
-                          fontSize: '0.7rem',
-                          fontWeight: 700,
-                          padding: '3px 8px',
-                          borderRadius: '4px',
-                          backgroundColor:
-                            obj.status === 'APPROVED' ? 'rgba(16, 185, 129, 0.15)' :
-                            obj.status === 'REVIEW' ? 'rgba(245, 158, 11, 0.15)' :
-                            'rgba(148, 163, 184, 0.15)',
-                          color:
-                            obj.status === 'APPROVED' ? 'var(--accent-emerald)' :
-                            obj.status === 'REVIEW' ? 'var(--accent-amber)' :
-                            'var(--text-muted)'
-                        }}>
-                          {obj.status}
-                        </span>
+                        {/* Status Badge (Updated in Yellow Box) */}
+                        {(() => {
+                          const matchingRun = isTestRunTracker ? testRuns.find(r => r.id === obj.id || r.name === obj.title) : null;
+                          const effectiveStatus = (isTestRunTracker && matchingRun?.overall_status) ? matchingRun.overall_status : (obj.status || 'NOT_RUN');
+                          const norm = (effectiveStatus || '').toUpperCase();
+                          
+                          let bg = 'rgba(148, 163, 184, 0.15)';
+                          let color = 'var(--text-muted)';
+                          let border = '1px solid rgba(148, 163, 184, 0.3)';
+                          
+                          if (norm === 'PASS' || norm === 'APPROVED') {
+                            bg = 'rgba(16, 185, 129, 0.2)';
+                            color = '#10b981';
+                            border = '1px solid rgba(16, 185, 129, 0.5)';
+                          } else if (norm === 'FAIL') {
+                            bg = 'rgba(239, 68, 68, 0.2)';
+                            color = '#ef4444';
+                            border = '1px solid rgba(239, 68, 68, 0.5)';
+                          } else if (norm === 'BLOCKED') {
+                            bg = 'rgba(245, 158, 11, 0.2)';
+                            color = '#f59e0b';
+                            border = '1px solid rgba(245, 158, 11, 0.5)';
+                          } else if (norm === 'IN_PROGRESS' || norm === 'REVIEW') {
+                            bg = 'rgba(56, 189, 248, 0.2)';
+                            color = '#38bdf8';
+                            border = '1px solid rgba(56, 189, 248, 0.5)';
+                          }
+
+                          return (
+                            <span
+                              className={`badge badge-${norm.toLowerCase().replace(/_/g, '-')}`}
+                              style={{
+                                fontSize: '0.72rem',
+                                fontWeight: 800,
+                                padding: '3px 9px',
+                                borderRadius: '4px',
+                                backgroundColor: bg,
+                                color: color,
+                                border: border,
+                                letterSpacing: '0.03em'
+                              }}
+                            >
+                              {effectiveStatus}
+                            </span>
+                          );
+                        })()}
 
                         {/* Safety Level */}
                         <span style={{
@@ -1842,9 +1871,15 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                 <span style={{ fontSize: '0.9rem', fontWeight: 800, color: 'var(--text-main)' }}>
                                   Execution Test Run
                                 </span>
-                                <span className={`badge badge-${(obj.status || 'NOT_RUN').toLowerCase().replace(/_/g, '-')}`}>
-                                  {obj.status || 'NOT_RUN'}
-                                </span>
+                                {(() => {
+                                  const matchingRun = testRuns.find(r => r.id === obj.id || r.name === obj.title);
+                                  const effectiveStatus = matchingRun?.overall_status || obj.status || 'NOT_RUN';
+                                  return (
+                                    <span className={`badge badge-${effectiveStatus.toLowerCase().replace(/_/g, '-')}`}>
+                                      {effectiveStatus}
+                                    </span>
+                                  );
+                                })()}
                               </div>
 
                               {(onNavigateToTestRun || onNavigateView) && (
@@ -2129,6 +2164,18 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   padding: '12px 14px',
                   borderRadius: '8px'
                 }}>
+                  {(() => {
+                    const matchingRun = activeObject ? testRuns.find(r => r.id === activeObject.id || r.name === activeObject.title) : null;
+                    const effectiveStatus = matchingRun?.overall_status || activeObject?.status || 'NOT_RUN';
+                    return (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Status in Tracker:</span>
+                        <span className={`badge badge-${effectiveStatus.toLowerCase().replace(/_/g, '-')}`} style={{ fontSize: '0.75rem', padding: '2px 8px' }}>
+                          {effectiveStatus}
+                        </span>
+                      </div>
+                    );
+                  })()}
                   <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>
                     Execution Test Run ready for step-by-step verification.
                   </div>

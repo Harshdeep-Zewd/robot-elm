@@ -993,19 +993,26 @@ export const App: React.FC = () => {
           requirement_type: 'Non-Functional Requirement',
           safety_level: 'SIL-2',
           test_subprocess: 'System Testing',
-          status: run.overall_status || 'PASS',
+          status: run.overall_status || 'NOT_RUN',
           priority: 'HIGH',
           owner_id: currentUser?.id || 1,
           owner_name: run.tester_name || currentUser?.name || 'Zewd',
           created_by_name: run.tester_name || currentUser?.name || 'Zewd',
           pre_action: `Target Test Set: ${run.test_set_title || run.test_set_key || 'Standard'}`,
-          post_action: `Execution status: ${run.overall_status || 'PASS'}`,
+          post_action: `Execution status: ${run.overall_status || 'NOT_RUN'}`,
           version: 1,
           created_at: run.started_at || new Date().toISOString(),
           updated_at: new Date().toISOString()
         };
         newObjects.unshift(newObj);
         objectsChanged = true;
+      } else {
+        // Synchronize status if run execution has been updated!
+        if (run.overall_status && matchingObj.status !== run.overall_status) {
+          matchingObj.status = run.overall_status as any;
+          matchingObj.updated_at = new Date().toISOString();
+          objectsChanged = true;
+        }
       }
     });
 
@@ -1019,7 +1026,7 @@ export const App: React.FC = () => {
           test_set_id: obj.folder_id || 9,
           test_config_id: 1,
           name: obj.title,
-          overall_status: (obj.status as any) || 'PASS',
+          overall_status: (obj.status as any) || 'NOT_RUN',
           tester_name: obj.owner_name || 'Zewd',
           test_set_key: 'TST-SET-001',
           test_set_title: obj.folder_name || 'System Test Set',
@@ -1029,6 +1036,12 @@ export const App: React.FC = () => {
         };
         newRuns.unshift(newRun);
         runsChanged = true;
+      } else {
+        // Synchronize status if obj status is newer
+        if (obj.status && obj.status !== 'NOT_RUN' && matchingRun.overall_status !== obj.status) {
+          matchingRun.overall_status = obj.status as any;
+          runsChanged = true;
+        }
       }
     });
 
@@ -1038,7 +1051,7 @@ export const App: React.FC = () => {
     if (runsChanged) {
       setTestRuns(newRuns);
     }
-  }, [currentTrackers, activeProject?.id, allObjects.length, testRuns.length]);
+  }, [currentTrackers, activeProject?.id, allObjects.length, testRuns]);
 
   const handleSelectProject = (p: Project) => {
     setActiveProjectId(p.id);
@@ -1381,6 +1394,42 @@ export const App: React.FC = () => {
     setActiveView('TRACKER');
   };
 
+  const handleSaveTestRunResults = (runId: number, newStatus: string, updatedDetail?: any) => {
+    // 1. Update testRunDetailsMap & save to localStorage
+    if (updatedDetail) {
+      setTestRunDetailsMap(prev => {
+        const next = { ...prev, [runId]: updatedDetail };
+        try { localStorage.setItem('roboserv_elm_test_run_details', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
+    }
+
+    // 2. Update testRuns & save to localStorage
+    setTestRuns(prev => {
+      const next = prev.map(r => (r.id === runId || (updatedDetail && r.name === updatedDetail.name)) ? { ...r, overall_status: newStatus as any } : r);
+      try { localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+
+    // 3. Update allObjects (the SQTR tracker / yellow box) & save to localStorage
+    setAllObjects(prev => {
+      const next = prev.map(obj => {
+        if (obj.id === runId || (updatedDetail && (obj.title === updatedDetail.name || obj.title === `Test Run for ${updatedDetail.test_set_title}`))) {
+          return {
+            ...obj,
+            status: newStatus as any,
+            version: (obj.version || 1) + 1,
+            updated_at: new Date().toISOString(),
+            post_action: `Execution completed: Overall Status ${newStatus}. All step outcomes recorded.`
+          };
+        }
+        return obj;
+      });
+      try { localStorage.setItem('roboserv_elm_objects', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
+  };
+
   const handleCreateTestRunFromSet = (testSet: EngineeringObject) => {
     // 1. Resolve folder name of test set and name format based on test set title
     const folder = allFolders.find(f => f.id === testSet.folder_id);
@@ -1685,6 +1734,7 @@ export const App: React.FC = () => {
               onNavigateView={(view) => setActiveView(view)}
               selectedRunIdProp={selectedTestRunId}
               onSelectRunIdProp={setSelectedTestRunId}
+              onSaveResults={handleSaveTestRunResults}
             />
           )}
 
