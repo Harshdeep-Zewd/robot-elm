@@ -74,7 +74,30 @@ export interface Folder {
 
 export type RequirementType = 'Functional Requirement' | 'Non-Functional Requirement' | 'Variable' | 'Parameter' | 'Folder';
 
-export type SafetyLevel = 'ASIL-D' | 'ASIL-C' | 'ASIL-B' | 'ASIL-A' | 'SIL-3' | 'SIL-2' | 'SIL-1' | 'Standard / Non-Safety';
+export type SafetyLevel =
+  | 'Safety-Related'
+  | 'Non-Safety-Related'
+  | 'Safety Relevance Under Assessment'
+  // Backward compatibility aliases
+  | 'ASIL-D' | 'ASIL-C' | 'ASIL-B' | 'ASIL-A' | 'SIL-3' | 'SIL-2' | 'SIL-1' | 'Standard / Non-Safety';
+
+export const CONTROLLED_SAFETY_LEVELS = [
+  'Safety-Related',
+  'Non-Safety-Related',
+  'Safety Relevance Under Assessment'
+] as const;
+
+export type ControlledSafetyLevel = typeof CONTROLLED_SAFETY_LEVELS[number];
+
+export const SAFETY_FRAMEWORKS = [
+  'ISO 13482 (Service Robots)',
+  'ISO 13849-1 (PL a-e)',
+  'IEC 62061 (SIL 1-3)',
+  'ISO 26262 (ASIL A-D)',
+  'IEC 61508 (Functional Safety)',
+  'UL 3100 (AGV / AMR Safety)',
+  'Not Applicable'
+] as const;
 
 export type TestSubProcess = 'Black-Box Testing' | 'Grey-Box Testing' | 'White-Box Testing' | 'Unit Testing' | 'Integration Testing' | 'SW Testing' | 'System Testing' | 'HIL Testing' | 'Field Testing';
 
@@ -90,6 +113,40 @@ export interface EngineeringObject {
   type: string;
   requirement_type?: RequirementType;
   safety_level?: SafetyLevel;
+  safety_framework?: string;
+  safety_justification?: string;
+  requirement_statement?: string;
+  acceptance_criteria?: string;
+  verification_method?: 'Inspection' | 'Analysis' | 'Demonstration' | 'Test';
+  verification_status?: 'Not Defined' | 'Not Covered' | 'Partially Covered' | 'Covered' | 'Verified' | 'Failed Verification';
+  preconditions?: string;
+  post_actions?: string;
+  test_level?: string;
+  test_domain?: string;
+  hardware_domain?: string;
+  software_domain?: string;
+  architecture_level?: string;
+  interface_type?: string;
+  source_subsystem?: string;
+  destination_subsystem?: string;
+  part_number?: string;
+  manufacturer?: string;
+  supplier?: string;
+  unit_cost?: number;
+  currency?: string;
+  quantity?: number;
+  hazard?: string;
+  severity?: string;
+  probability?: string;
+  risk_level?: string;
+  residual_severity?: string;
+  residual_probability?: string;
+  residual_risk_level?: string;
+  impact_assessment?: Record<string, any>;
+  release_version?: string;
+  configuration_ref?: string;
+  legacy_tracker_key?: string;
+  legacy_object_key?: string;
   test_subprocess?: TestSubProcess;
   status: string;
   priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
@@ -166,6 +223,12 @@ export interface TestStep {
   step_number: number;
   action: string;
   expected_result: string;
+  stimulus?: string;
+  actual_result?: string;
+  verdict?: 'NOT_RUN' | 'PASS' | 'FAIL' | 'BLOCKED';
+  measurement?: string;
+  evidence_url?: string;
+  comments?: string;
 }
 
 export interface TestConfig {
@@ -179,6 +242,7 @@ export interface TestConfig {
   parameter_config: string;
   battery_config: string;
   environment_config: string;
+  revision?: number;
 }
 
 export interface TestRun {
@@ -196,6 +260,8 @@ export interface TestRun {
   started_at?: string;
   completed_at?: string;
   notes?: string;
+  evidence_summary?: string;
+  failure_description?: string;
 }
 
 export interface TestRunResult {
@@ -222,6 +288,39 @@ export interface TestStepResult {
   notes?: string;
 }
 
+export type RelationshipType =
+  | 'DERIVES_FROM'
+  | 'REFINES'
+  | 'DECOMPOSES_INTO'
+  | 'ALLOCATED_TO'
+  | 'IMPLEMENTED_BY'
+  | 'REALIZED_BY'
+  | 'INTERFACES_WITH'
+  | 'DEPENDS_ON'
+  | 'USES_COMPONENT'
+  | 'MITIGATES'
+  | 'VERIFIES'
+  | 'VALIDATES'
+  | 'TESTED_BY'
+  | 'EXECUTED_IN'
+  | 'REPORTED_BY'
+  | 'FOUND_IN'
+  | 'CORRECTED_BY'
+  | 'CHANGED_BY'
+  | 'SUPERSEDES'
+  | 'INCLUDED_IN'
+  | 'APPROVED_BY'
+  | 'DOCUMENTS'
+  | 'RELATED_TO'
+  // Legacy aliases
+  | 'VERIFIED_BY'
+  | 'MITIGATED_BY'
+  | 'DERIVED_TO'
+  | 'EXECUTED_AS'
+  | 'EXECUTED_FROM'
+  | 'USES_CONFIG'
+  | 'PRODUCES_RESULT';
+
 export interface Relationship {
   id: number;
   source_id: number;
@@ -232,7 +331,10 @@ export interface Relationship {
   target_key?: string;
   target_title?: string;
   target_type?: string;
-  relationship_type: 'VERIFIED_BY' | 'MITIGATED_BY' | 'ALLOCATED_TO' | 'DERIVED_TO' | 'INCLUDED_IN' | 'EXECUTED_AS' | 'USES_CONFIG' | 'PRODUCES_RESULT' | 'DEPENDS_ON' | 'IMPLEMENTED_BY';
+  relationship_type: RelationshipType;
+  description?: string;
+  created_at?: string;
+  created_by?: string;
 }
 
 export interface ChangeRequest {

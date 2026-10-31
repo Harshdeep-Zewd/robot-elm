@@ -218,6 +218,26 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
       return;
     }
 
+    const isRequirement = tracker.type === 'REQUIREMENT' || tracker.key.includes('REQ') || ['STK-REQ', 'SYS-REQ', 'HW-REQ', 'SW-REQ', 'QREQ'].includes(tracker.key);
+    if (isRequirement) {
+      if (!safetyLevel || !['Safety-Related', 'Non-Safety-Related', 'Safety Relevance Under Assessment'].includes(safetyLevel as any)) {
+        alert("Validation Error: Safety Level is MANDATORY for all requirement records!\n\nPlease select one of:\n• Safety-Related\n• Non-Safety-Related\n• Safety Relevance Under Assessment");
+        return;
+      }
+    }
+
+    const isTestCase = tracker.type === 'TEST_CASE' || tracker.key === 'TC' || tracker.prefix.includes('TC-');
+    if (isTestCase) {
+      if (!preAction.trim()) {
+        alert("Validation Error: Preconditions are MANDATORY for all Test Cases!");
+        return;
+      }
+      if (!postAction.trim()) {
+        alert("Validation Error: Post-Actions are MANDATORY for all Test Cases!");
+        return;
+      }
+    }
+
     const selectedFolder = folders.find(f => f.id === folderId);
 
     // Save current state as historical snapshot before bumping version
@@ -978,21 +998,17 @@ export const RequirementEditDashboard: React.FC<RequirementEditDashboardProps> =
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    Severity / Safety Level
+                    Safety Level
                   </label>
                   <select
                     disabled={isHistorical}
-                    value={isHistorical ? (historicalSnapshot?.safety_level || 'ASIL-D') : safetyLevel}
+                    value={isHistorical ? (historicalSnapshot?.safety_level || 'Safety-Related') : safetyLevel}
                     onChange={(e) => setSafetyLevel(e.target.value as SafetyLevel)}
                     style={{ width: '100%', fontSize: '0.8rem', opacity: isHistorical ? 0.7 : 1 }}
                   >
-                    <option value="ASIL-D">ASIL-D</option>
-                    <option value="ASIL-C">ASIL-C</option>
-                    <option value="ASIL-B">ASIL-B</option>
-                    <option value="ASIL-A">ASIL-A</option>
-                    <option value="SIL-3">SIL-3</option>
-                    <option value="SIL-2">SIL-2</option>
-                    <option value="Standard / Non-Safety">Standard / Non-Safety</option>
+                    <option value="Safety-Related">Safety-Related</option>
+                    <option value="Non-Safety-Related">Non-Safety-Related</option>
+                    <option value="Safety Relevance Under Assessment">Safety Relevance Under Assessment</option>
                   </select>
                 </div>
               </>

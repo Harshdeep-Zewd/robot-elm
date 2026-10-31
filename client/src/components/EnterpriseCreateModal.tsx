@@ -25,6 +25,10 @@ interface EnterpriseCreateModalProps {
     post_action?: string;
     requirement_type?: RequirementType;
     safety_level?: SafetyLevel;
+    safety_framework?: string;
+    safety_justification?: string;
+    acceptance_criteria?: string;
+    verification_method?: 'Inspection' | 'Analysis' | 'Demonstration' | 'Test';
     test_subprocess?: TestSubProcess;
     priority?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
     start_date?: string;
@@ -70,7 +74,11 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
   const [category, setCategory] = useState('Functional Requirement');
   const [release, setRelease] = useState('Release 2.4');
   const [priority, setPriority] = useState<'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL'>('MEDIUM');
-  const [safetyLevel, setSafetyLevel] = useState<SafetyLevel>('ASIL-D');
+  const [safetyLevel, setSafetyLevel] = useState<SafetyLevel>('Safety-Related');
+  const [safetyFramework, setSafetyFramework] = useState('ISO 13482 (Service Robots)');
+  const [safetyJustification, setSafetyJustification] = useState('');
+  const [acceptanceCriteria, setAcceptanceCriteria] = useState('');
+  const [verificationMethod, setVerificationMethod] = useState<'Inspection' | 'Analysis' | 'Demonstration' | 'Test'>('Test');
   const [preAction, setPreAction] = useState('');
   const [description, setDescription] = useState('');
   const [postAction, setPostAction] = useState('');
@@ -84,13 +92,42 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
     setPreAction('');
     setDescription('');
     setPostAction('');
+    setSafetyJustification('');
+    setAcceptanceCriteria('');
     setAssocTargetId(null);
   };
 
+  const isRequirement = tracker.type === 'REQUIREMENT' || tracker.key.includes('REQ') || ['STK-REQ', 'SYS-REQ', 'HW-REQ', 'SW-REQ', 'QREQ'].includes(tracker.key);
+  const isTestCase = tracker.type === 'TEST_CASE' || tracker.key === 'TC' || tracker.prefix.includes('TC-');
+
   const handleSaveInternal = (closeAfter: boolean) => {
     if (!title.trim()) {
-      alert("Summary / Title is required!");
+      alert("Validation Error: Summary / Title is required!");
       return;
+    }
+
+    // MANDATORY REQUIREMENT FIELD RULE
+    if (isRequirement) {
+      if (!safetyLevel || !['Safety-Related', 'Non-Safety-Related', 'Safety Relevance Under Assessment'].includes(safetyLevel as any)) {
+        alert("Validation Error: Safety Level is MANDATORY for all requirement records!\n\nPlease select one of:\n• Safety-Related\n• Non-Safety-Related\n• Safety Relevance Under Assessment");
+        return;
+      }
+    }
+
+    // MANDATORY TEST CASE FIELDS RULE
+    if (isTestCase) {
+      if (!preAction.trim()) {
+        alert("Validation Error: Preconditions are MANDATORY for all Test Cases!");
+        return;
+      }
+      if (!description.trim()) {
+        alert("Validation Error: Test Steps & Expected Results are MANDATORY for all Test Cases!");
+        return;
+      }
+      if (!postAction.trim()) {
+        alert("Validation Error: Post-Actions are MANDATORY for all Test Cases!");
+        return;
+      }
     }
 
     const relMap: Record<string, string> = {
@@ -108,6 +145,10 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
       pre_action: preAction.trim(),
       post_action: postAction.trim(),
       safety_level: safetyLevel,
+      safety_framework: safetyLevel === 'Safety-Related' ? safetyFramework : undefined,
+      safety_justification: safetyJustification.trim() || undefined,
+      acceptance_criteria: acceptanceCriteria.trim() || undefined,
+      verification_method: verificationMethod,
       priority: priority,
       requirement_type: category as RequirementType,
       start_date: startDate,
@@ -472,22 +513,57 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
 
                 <div>
                   <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                    Safety Severity / ASIL
+                    Safety Level {isRequirement && <span style={{ color: 'var(--accent-rose)' }}>* (Mandatory)</span>}
                   </label>
                   <select
                     value={safetyLevel}
                     onChange={(e) => setSafetyLevel(e.target.value as SafetyLevel)}
-                    style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
+                    style={{
+                      width: '100%',
+                      fontSize: '0.8rem',
+                      padding: '6px 10px',
+                      border: isRequirement ? '1px solid var(--accent-rose)' : '1px solid var(--border-color)'
+                    }}
                   >
-                    <option value="ASIL-D">ASIL-D (Highest Rigor)</option>
-                    <option value="ASIL-C">ASIL-C</option>
-                    <option value="ASIL-B">ASIL-B</option>
-                    <option value="ASIL-A">ASIL-A</option>
-                    <option value="SIL-3">SIL-3 (Industrial IEC 61508)</option>
-                    <option value="SIL-2">SIL-2</option>
-                    <option value="Standard / Non-Safety">Standard / Non-Safety</option>
+                    <option value="Safety-Related">Safety-Related</option>
+                    <option value="Non-Safety-Related">Non-Safety-Related</option>
+                    <option value="Safety Relevance Under Assessment">Safety Relevance Under Assessment</option>
                   </select>
                 </div>
+
+                {safetyLevel === 'Safety-Related' && (
+                  <>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                        Safety Framework / Standard
+                      </label>
+                      <select
+                        value={safetyFramework}
+                        onChange={(e) => setSafetyFramework(e.target.value)}
+                        style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
+                      >
+                        <option value="ISO 13482 (Service Robots)">ISO 13482 (Service Robots)</option>
+                        <option value="ISO 13849-1 (PL a-e)">ISO 13849-1 (Performance Level)</option>
+                        <option value="IEC 62061 (SIL 1-3)">IEC 62061 (Functional Safety)</option>
+                        <option value="UL 3100 (AGV / AMR Safety)">UL 3100 (AMR Safety)</option>
+                        <option value="Custom / Other">Custom / Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                        Safety Justification / Hazard Link
+                      </label>
+                      <input
+                        type="text"
+                        value={safetyJustification}
+                        onChange={(e) => setSafetyJustification(e.target.value)}
+                        placeholder="e.g. Collision hazard control via tactile bumper and E-stop"
+                        style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           )}

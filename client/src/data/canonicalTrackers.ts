@@ -13,6 +13,15 @@ export interface TrackerTemplate {
 }
 
 export const CANONICAL_CATEGORIES = [
+  'Group 1: Project Governance',
+  'Group 2: Requirements Engineering',
+  'Group 3: Architecture, Design & Components',
+  'Group 4: Decisions, Safety & Quality',
+  'Group 5: Verification & Validation',
+  'Group 6: Defect Management',
+  'Group 7: Task & Change Management',
+  'Custom Trackers',
+  // Backward compatibility legacy category names
   'Requirements & Verification',
   'Architecture & Hardware',
   'Testing, Sets & Runs',
@@ -20,11 +29,20 @@ export const CANONICAL_CATEGORIES = [
   'Defects & Problems',
   'Tasks & Epics',
   'Changes & Releases',
-  'Documents & Governance',
-  'Custom Trackers'
+  'Documents & Governance'
 ] as const;
 
 export type CanonicalCategory = typeof CANONICAL_CATEGORIES[number];
+
+export const CORE_25_CATEGORIES = [
+  'Group 1: Project Governance',
+  'Group 2: Requirements Engineering',
+  'Group 3: Architecture, Design & Components',
+  'Group 4: Decisions, Safety & Quality',
+  'Group 5: Verification & Validation',
+  'Group 6: Defect Management',
+  'Group 7: Task & Change Management'
+] as const;
 
 /**
  * Strips legacy serial numbers and prefixes (e.g., '028_', '031_', '054A_', '0741 ', '10_')
@@ -40,8 +58,269 @@ export function cleanTrackerName(name: string): string {
     .trim();
 }
 
-export const CANONICAL_TRACKERS: TrackerTemplate[] = [
-  // ==========================================
+/**
+ * Authoritative 25 Consolidated Core Trackers for Systems Engineering.
+ */
+export const CORE_25_TRACKERS: TrackerTemplate[] = [
+  {
+    "index": 1,
+    "name": "Systems Engineering Strategy",
+    "key": "SYS-STRAT",
+    "category": "Group 1: Project Governance",
+    "type": "DOCUMENT",
+    "prefix": "SYS-STRAT-",
+    "source": "Governance",
+    "desc": "Defines the complete engineering lifecycle, methodology, standards, review rules, milestones, and governance framework for the robotic product."
+  },
+  {
+    "index": 2,
+    "name": "Controlled Engineering Documents",
+    "key": "DOC",
+    "category": "Group 1: Project Governance",
+    "type": "DOCUMENT",
+    "prefix": "DOC-",
+    "source": "Governance",
+    "desc": "Controlled engineering reports, problem statements, specifications, calculation sheets, CAD exports, wiring diagrams, and manuals."
+  },
+  {
+    "index": 3,
+    "name": "Minutes of Meeting",
+    "key": "MOM",
+    "category": "Group 1: Project Governance",
+    "type": "DOCUMENT",
+    "prefix": "MOM-",
+    "source": "Governance",
+    "desc": "Formal records of systems engineering reviews, architecture boards, gate assessments, action items, and technical alignment meetings."
+  },
+  {
+    "index": 4,
+    "name": "Stakeholder Requirements",
+    "key": "STK-REQ",
+    "category": "Group 2: Requirements Engineering",
+    "type": "REQUIREMENT",
+    "prefix": "STK-REQ-",
+    "source": "Requirements",
+    "desc": "High-level operational needs, business goals, and constraints captured from restaurant owners, managers, kitchen staff, diners, and maintenance."
+  },
+  {
+    "index": 5,
+    "name": "System Requirements",
+    "key": "SYS-REQ",
+    "category": "Group 2: Requirements Engineering",
+    "type": "REQUIREMENT",
+    "prefix": "SYS-REQ-",
+    "source": "Requirements",
+    "desc": "Functional and non-functional requirements defining what the complete robot platform must do (delivery, navigation, E-stop, payload, battery life)."
+  },
+  {
+    "index": 6,
+    "name": "Hardware Requirements",
+    "key": "HW-REQ",
+    "category": "Group 2: Requirements Engineering",
+    "type": "REQUIREMENT",
+    "prefix": "HW-REQ-",
+    "source": "Requirements",
+    "desc": "Detailed physical requirements allocated to chassis, motors, controllers, power distribution, battery, BMS, computing, sensors, and mechanical tray."
+  },
+  {
+    "index": 7,
+    "name": "Software Requirements",
+    "key": "SW-REQ",
+    "category": "Group 2: Requirements Engineering",
+    "type": "REQUIREMENT",
+    "prefix": "SW-REQ-",
+    "source": "Requirements",
+    "desc": "Software requirements allocated to ROS 2 nodes, localization, mapping, Nav2 path planning, obstacle avoidance, order integration, and diagnostics."
+  },
+  {
+    "index": 8,
+    "name": "System Architecture & Design",
+    "key": "SAD",
+    "category": "Group 3: Architecture, Design & Components",
+    "type": "ARCHITECTURE",
+    "prefix": "SAD-",
+    "source": "Architecture",
+    "desc": "System-level architectural decompositions, functional allocations, logical partitions, physical block diagrams, and multi-tier design models."
+  },
+  {
+    "index": 9,
+    "name": "Subsystem Design",
+    "key": "SUBD",
+    "category": "Group 3: Architecture, Design & Components",
+    "type": "ARCHITECTURE",
+    "prefix": "SUBD-",
+    "source": "Architecture",
+    "desc": "Subsystem engineering records covering mechanical structure, electrical layout, power distribution, sensor mounts, firmware, and embedded controls."
+  },
+  {
+    "index": 10,
+    "name": "Interface Control",
+    "key": "ICD",
+    "category": "Group 3: Architecture, Design & Components",
+    "type": "ARCHITECTURE",
+    "prefix": "ICD-",
+    "source": "Architecture",
+    "desc": "Defines and controls physical, electrical, CAN bus, UART, Ethernet, ROS 2 topics/actions/services, and external restaurant POS/app interfaces."
+  },
+  {
+    "index": 11,
+    "name": "Components & Bill of Materials",
+    "key": "CMP",
+    "category": "Group 3: Architecture, Design & Components",
+    "type": "COMPONENT",
+    "prefix": "CMP-",
+    "source": "Architecture",
+    "desc": "Manages component selection, specifications, datasheets, supplier part numbers, lead times, costs, and hierarchical multi-level robot BOM."
+  },
+  {
+    "index": 12,
+    "name": "Architecture & Decision Records",
+    "key": "ADR",
+    "category": "Group 4: Decisions, Safety & Quality",
+    "type": "DOCUMENT",
+    "prefix": "ADR-",
+    "source": "Safety & Quality",
+    "desc": "Records significant engineering decisions, context, evaluated alternatives, trade-off analysis, justification rationale, and consequences."
+  },
+  {
+    "index": 13,
+    "name": "Risk & Hazard Register",
+    "key": "RISK",
+    "category": "Group 4: Decisions, Safety & Quality",
+    "type": "RISK",
+    "prefix": "RISK-",
+    "source": "Safety & Quality",
+    "desc": "Comprehensive hazard analysis and risk assessment under ISO 13482, tracking initiating causes, severity, likelihood, controls, and residual risks."
+  },
+  {
+    "index": 14,
+    "name": "Safety Plan & Safety Case",
+    "key": "SAFE",
+    "category": "Group 4: Decisions, Safety & Quality",
+    "type": "DOCUMENT",
+    "prefix": "SAFE-",
+    "source": "Safety & Quality",
+    "desc": "Maintains product-safety strategy, safety arguments, standards compliance proofs (ISO 13482, ISO 13849), protective measures, and safety acceptance."
+  },
+  {
+    "index": 15,
+    "name": "Quality Requirements",
+    "key": "QREQ",
+    "category": "Group 4: Decisions, Safety & Quality",
+    "type": "REQUIREMENT",
+    "prefix": "QREQ-",
+    "source": "Safety & Quality",
+    "desc": "Quality-management, process compliance, reliability metrics (MTBF), maintainability targets, supplier quality requirements, and audit controls."
+  },
+  {
+    "index": 16,
+    "name": "Verification & Validation Plans",
+    "key": "VVP",
+    "category": "Group 5: Verification & Validation",
+    "type": "DOCUMENT",
+    "prefix": "VVP-",
+    "source": "Verification",
+    "desc": "Governing verification & validation strategies, campaign objectives, environments, entry/exit criteria, and test resource allocations."
+  },
+  {
+    "index": 17,
+    "name": "Universal Test Cases",
+    "key": "TC",
+    "category": "Group 5: Verification & Validation",
+    "type": "TEST_CASE",
+    "prefix": "TC-",
+    "source": "Verification",
+    "desc": "Universal reusable test-case definitions with mandatory Preconditions, ordered Test Steps, expected results per step, and Post-Actions.",
+    "enable_test_steps": true
+  },
+  {
+    "index": 18,
+    "name": "Test Configurations",
+    "key": "TCFG",
+    "category": "Group 5: Verification & Validation",
+    "type": "CONFIGURATION",
+    "prefix": "TCFG-",
+    "source": "Verification",
+    "desc": "Controls exact hardware build, firmware version, ROS 2 parameters, payload conditions, and test environment setups for reproducible testing."
+  },
+  {
+    "index": 19,
+    "name": "Test Sets",
+    "key": "TSET",
+    "category": "Group 5: Verification & Validation",
+    "type": "TEST_SET",
+    "prefix": "TSET-",
+    "source": "Verification",
+    "desc": "Structured collections of test cases grouped into execution campaigns, qualification suites, regression runs, or subsystem verification batches."
+  },
+  {
+    "index": 20,
+    "name": "Test Runs",
+    "key": "TRUN",
+    "category": "Group 5: Verification & Validation",
+    "type": "TEST_RUN",
+    "prefix": "TRUN-",
+    "source": "Verification",
+    "desc": "Historical execution instances of test cases and sets, preserving step-level verdicts, actual outcomes, measurements, and verification evidence.",
+    "enable_test_steps": true
+  },
+  {
+    "index": 21,
+    "name": "Test Reports",
+    "key": "TREP",
+    "category": "Group 5: Verification & Validation",
+    "type": "DOCUMENT",
+    "prefix": "TREP-",
+    "source": "Verification",
+    "desc": "Documented campaign summaries, pass/fail analytics, defect distributions, deviations, coverage proofs, and engineering acceptance statements."
+  },
+  {
+    "index": 22,
+    "name": "Defects & Problem Reports",
+    "key": "DEF",
+    "category": "Group 6: Defect Management",
+    "type": "DEFECT",
+    "prefix": "DEF-",
+    "source": "Defects",
+    "desc": "Consolidates hardware faults, software bugs, test failures, integration anomalies, and restaurant field defects with root cause and retest tracking."
+  },
+  {
+    "index": 23,
+    "name": "Engineering Tasks & Epics",
+    "key": "TASK",
+    "category": "Group 7: Task & Change Management",
+    "type": "TASK",
+    "prefix": "TASK-",
+    "source": "Tasks",
+    "desc": "Manages engineering tasks, research investigations, design activities, development sprints, and epics with parent-child task hierarchies."
+  },
+  {
+    "index": 24,
+    "name": "Change Requests",
+    "key": "CR",
+    "category": "Group 7: Task & Change Management",
+    "type": "CHANGE_REQUEST",
+    "prefix": "CR-",
+    "source": "Changes",
+    "desc": "Rigorous engineering change control with multi-disciplinary impact analysis across requirements, architecture, BOM, safety, and testing."
+  },
+  {
+    "index": 25,
+    "name": "Configuration & Releases",
+    "key": "REL",
+    "category": "Group 7: Task & Change Management",
+    "type": "RELEASE",
+    "prefix": "REL-",
+    "source": "Releases",
+    "desc": "Authoritative configuration baselines and formal releases bundling approved requirements, hardware revisions, BOM, software commits, and test evidence."
+  }
+];
+
+/**
+ * Preserved catalog of the original 101 legacy trackers (Non-Negotiable Rule 1).
+ */
+export const LEGACY_101_TRACKERS: TrackerTemplate[] = [
+// ==========================================
   // Group 1: Requirements & Verification (15)
   // ==========================================
   {
@@ -1116,51 +1395,639 @@ for (const ct of CANONICAL_TRACKERS) {
   CANONICAL_KEY_MAP.set(ct.key.toUpperCase(), ct.category);
   CANONICAL_NAME_MAP.set(cleanTrackerName(ct.name).toLowerCase(), ct.category);
 }
+];
 
 /**
- * Resolves a tracker to one of the 9 categories.
- * Guaranteed: All custom-created trackers are routed to 'Custom Trackers' (Group 9),
- * never to a random group.
+ * Migration Mapping Registry from the 101 legacy tracker prefixes to the 25 core trackers.
+ */
+export const MIGRATION_MAPPING: Record<string, { targetKey: string; targetPrefix: string; reason: string }> = {
+  "IRS-": {
+    "targetKey": "STK-REQ",
+    "targetPrefix": "STK-REQ-",
+    "reason": "Internal stakeholder requirements and boundary constraints"
+  },
+  "CQR-": {
+    "targetKey": "STK-REQ",
+    "targetPrefix": "STK-REQ-",
+    "reason": "Customer and stakeholder quality requirements"
+  },
+  "CRSSW-": {
+    "targetKey": "STK-REQ",
+    "targetPrefix": "STK-REQ-",
+    "reason": "Customer-specified software requirements"
+  },
+  "CRSEMC-": {
+    "targetKey": "STK-REQ",
+    "targetPrefix": "STK-REQ-",
+    "reason": "Customer electromagnetic compatibility requirements"
+  },
+  "CRST-": {
+    "targetKey": "STK-REQ",
+    "targetPrefix": "STK-REQ-",
+    "reason": "Customer test and acceptance requirements"
+  },
+  "CRSENV-": {
+    "targetKey": "STK-REQ",
+    "targetPrefix": "STK-REQ-",
+    "reason": "Customer environmental operating requirements"
+  },
+  "CRSREF-": {
+    "targetKey": "DOC",
+    "targetPrefix": "DOC-",
+    "reason": "Customer reference specifications and documents"
+  },
+  "SRS-": {
+    "targetKey": "SYS-REQ",
+    "targetPrefix": "SYS-REQ-",
+    "reason": "System requirement specification"
+  },
+  "PAR-": {
+    "targetKey": "SYS-REQ",
+    "targetPrefix": "SYS-REQ-",
+    "reason": "System engineering parameters and constraints"
+  },
+  "SRV-": {
+    "targetKey": "SYS-REQ",
+    "targetPrefix": "SYS-REQ-",
+    "reason": "System requirement verification specifications"
+  },
+  "SRV-OLD-": {
+    "targetKey": "SYS-REQ",
+    "targetPrefix": "SYS-REQ-",
+    "reason": "Legacy system requirement verification records"
+  },
+  "HWR-": {
+    "targetKey": "HW-REQ",
+    "targetPrefix": "HW-REQ-",
+    "reason": "Hardware-allocated engineering requirements"
+  },
+  "HSWR-": {
+    "targetKey": "SW-REQ",
+    "targetPrefix": "SW-REQ-",
+    "reason": "Hardware-software interface requirements"
+  },
+  "SWR-": {
+    "targetKey": "SW-REQ",
+    "targetPrefix": "SW-REQ-",
+    "reason": "Software requirements and ROS 2 behavior"
+  },
+  "SWCTL-": {
+    "targetKey": "SW-REQ",
+    "targetPrefix": "SW-REQ-",
+    "reason": "Software control loop and motion requirements"
+  },
+  "SYS-STRAT-": {
+    "targetKey": "SYS-STRAT",
+    "targetPrefix": "SYS-STRAT-",
+    "reason": "Systems engineering strategy and lifecycle governance"
+  },
+  "COM-": {
+    "targetKey": "ICD",
+    "targetPrefix": "ICD-",
+    "reason": "Communication protocol and bus interfaces"
+  },
+  "DS-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Design specifications and subsystem engineering"
+  },
+  "FC-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Functional concepts and subsystem logic"
+  },
+  "SAD-": {
+    "targetKey": "SAD",
+    "targetPrefix": "SAD-",
+    "reason": "System architecture and design models"
+  },
+  "TCI-": {
+    "targetKey": "ICD",
+    "targetPrefix": "ICD-",
+    "reason": "Test control interfaces"
+  },
+  "HSI-": {
+    "targetKey": "ICD",
+    "targetPrefix": "ICD-",
+    "reason": "Hardware-software interfaces"
+  },
+  "SYSD-": {
+    "targetKey": "SAD",
+    "targetPrefix": "SAD-",
+    "reason": "System design and architectural decomposition"
+  },
+  "EMD-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Electromechanical subsystem design"
+  },
+  "MED-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Mechanical chassis and enclosure design"
+  },
+  "HWAD-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Hardware architecture detailed design"
+  },
+  "HWDD-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Hardware detailed schematics and PCBs"
+  },
+  "SWAD-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Software architecture design and nodes"
+  },
+  "SWDD-": {
+    "targetKey": "SUBD",
+    "targetPrefix": "SUBD-",
+    "reason": "Software detailed design and modules"
+  },
+  "EMCTP-DV-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "EMC design verification test plans"
+  },
+  "EMCTR-DV-": {
+    "targetKey": "TREP",
+    "targetPrefix": "TREP-",
+    "reason": "EMC design verification test reports"
+  },
+  "EMCTP-PV-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "EMC process verification test plans"
+  },
+  "EMVTR-PV-": {
+    "targetKey": "TREP",
+    "targetPrefix": "TREP-",
+    "reason": "EMC process verification test reports"
+  },
+  "HWDV-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Hardware design verification test cases"
+  },
+  "HWTP-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "Hardware test campaign plans"
+  },
+  "HWTR-": {
+    "targetKey": "TREP",
+    "targetPrefix": "TREP-",
+    "reason": "Hardware test execution reports"
+  },
+  "HSITP-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "Hardware-software integration test plans"
+  },
+  "DVP-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "Design verification master plans"
+  },
+  "PVP-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "Production validation master plans"
+  },
+  "SQTS-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "Software quality test specifications"
+  },
+  "SIITS-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "System integration & interface test specs"
+  },
+  "MQTP-": {
+    "targetKey": "VVP",
+    "targetPrefix": "VVP-",
+    "reason": "Manufacturing quality test plans"
+  },
+  "TEC-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Test execution cases"
+  },
+  "TCSQT-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Software quality test cases"
+  },
+  "TCSIT-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "System integration test cases"
+  },
+  "TCSUT-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Subsystem unit test cases"
+  },
+  "TCHQT-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Hardware quality test cases"
+  },
+  "TCIT-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Integration test cases"
+  },
+  "REL-TST-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Release qualification test cases"
+  },
+  "TC-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Universal test cases"
+  },
+  "HWT-": {
+    "targetKey": "TC",
+    "targetPrefix": "TC-",
+    "reason": "Hardware component test cases"
+  },
+  "TE-CFG-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "Test environment configurations"
+  },
+  "TCSQT-CFG-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "Software test configurations"
+  },
+  "TCSIT-CFG-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "System integration test configurations"
+  },
+  "TCSUT-CFG-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "Subsystem test configurations"
+  },
+  "SQTC-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "Software qualification test configs"
+  },
+  "TCHQT-CFG-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "Hardware quality test configurations"
+  },
+  "TCIT-CFG-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "Integration test configurations"
+  },
+  "TCFG-": {
+    "targetKey": "TCFG",
+    "targetPrefix": "TCFG-",
+    "reason": "Test configurations"
+  },
+  "TE-SET-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "Test execution sets"
+  },
+  "TSSQT-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "Software quality test sets"
+  },
+  "TSSIT-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "System integration test sets"
+  },
+  "TSSUT-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "Subsystem unit test sets"
+  },
+  "SQTS-SET-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "Software qualification suites"
+  },
+  "SITS-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "System integration test suites"
+  },
+  "TSHQT-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "Hardware qualification test sets"
+  },
+  "TSIT-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "Integration test suites"
+  },
+  "TSET-": {
+    "targetKey": "TSET",
+    "targetPrefix": "TSET-",
+    "reason": "Test sets"
+  },
+  "SQTR-": {
+    "targetKey": "TRUN",
+    "targetPrefix": "TRUN-",
+    "reason": "Software qualification test runs"
+  },
+  "TR-": {
+    "targetKey": "TRUN",
+    "targetPrefix": "TRUN-",
+    "reason": "Test execution runs"
+  },
+  "TRUN-": {
+    "targetKey": "TRUN",
+    "targetPrefix": "TRUN-",
+    "reason": "Test runs"
+  },
+  "TREP-": {
+    "targetKey": "TREP",
+    "targetPrefix": "TREP-",
+    "reason": "Test summary reports"
+  },
+  "RSWRS-": {
+    "targetKey": "RISK",
+    "targetPrefix": "RISK-",
+    "reason": "Safety risk assessment and hazard log"
+  },
+  "QA-": {
+    "targetKey": "QREQ",
+    "targetPrefix": "QREQ-",
+    "reason": "Quality assurance criteria and requirements"
+  },
+  "SafeP-": {
+    "targetKey": "SAFE",
+    "targetPrefix": "SAFE-",
+    "reason": "Safety plan and ISO 13482 safety case"
+  },
+  "HWF-": {
+    "targetKey": "DEF",
+    "targetPrefix": "DEF-",
+    "reason": "Hardware defect reports"
+  },
+  "HWTF-": {
+    "targetKey": "DEF",
+    "targetPrefix": "DEF-",
+    "reason": "Hardware test failure records"
+  },
+  "SWB-": {
+    "targetKey": "DEF",
+    "targetPrefix": "DEF-",
+    "reason": "Software bug reports"
+  },
+  "PR-": {
+    "targetKey": "DEF",
+    "targetPrefix": "DEF-",
+    "reason": "Problem reports"
+  },
+  "PRO-": {
+    "targetKey": "DEF",
+    "targetPrefix": "DEF-",
+    "reason": "Product observation reports"
+  },
+  "DEF-": {
+    "targetKey": "DEF",
+    "targetPrefix": "DEF-",
+    "reason": "Defects & problem reports"
+  },
+  "SYST-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "System engineering work packages"
+  },
+  "HWTK-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Hardware engineering tasks"
+  },
+  "SWTK-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Software development tasks"
+  },
+  "SWEPIC-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Software epics and capabilities"
+  },
+  "QAD-OLD-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Quality assurance action items"
+  },
+  "QAD-EPIC-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Quality assurance epics"
+  },
+  "TSK-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "General engineering tasks"
+  },
+  "HWTT-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Hardware testing tasks"
+  },
+  "SWTT-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Software testing tasks"
+  },
+  "SWTRV-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Software review tasks"
+  },
+  "STT-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "System test tasks"
+  },
+  "TASK-": {
+    "targetKey": "TASK",
+    "targetPrefix": "TASK-",
+    "reason": "Engineering tasks & epics"
+  },
+  "SWCR-": {
+    "targetKey": "CR",
+    "targetPrefix": "CR-",
+    "reason": "Software change requests"
+  },
+  "CR-": {
+    "targetKey": "CR",
+    "targetPrefix": "CR-",
+    "reason": "Engineering change requests"
+  },
+  "SWCIT-": {
+    "targetKey": "CR",
+    "targetPrefix": "CR-",
+    "reason": "Software continuous integration tasks/changes"
+  },
+  "CMP-": {
+    "targetKey": "CMP",
+    "targetPrefix": "CMP-",
+    "reason": "Components & Bill of Materials"
+  },
+  "CMR-": {
+    "targetKey": "REL",
+    "targetPrefix": "REL-",
+    "reason": "Configuration management release baselines"
+  },
+  "PLT-": {
+    "targetKey": "REL",
+    "targetPrefix": "REL-",
+    "reason": "Platform release configurations"
+  },
+  "HWR-REL-": {
+    "targetKey": "REL",
+    "targetPrefix": "REL-",
+    "reason": "Hardware release baselines"
+  },
+  "PROJ-REL-": {
+    "targetKey": "REL",
+    "targetPrefix": "REL-",
+    "reason": "Project milestone releases"
+  },
+  "SWR-REL-": {
+    "targetKey": "REL",
+    "targetPrefix": "REL-",
+    "reason": "Software version releases"
+  },
+  "SYS-REL-": {
+    "targetKey": "REL",
+    "targetPrefix": "REL-",
+    "reason": "System release baselines"
+  },
+  "REL-": {
+    "targetKey": "REL",
+    "targetPrefix": "REL-",
+    "reason": "Configuration & releases"
+  },
+  "DOC-": {
+    "targetKey": "DOC",
+    "targetPrefix": "DOC-",
+    "reason": "Controlled engineering documents"
+  },
+  "MoM-": {
+    "targetKey": "MOM",
+    "targetPrefix": "MOM-",
+    "reason": "Minutes of meeting"
+  },
+  "MOM-": {
+    "targetKey": "MOM",
+    "targetPrefix": "MOM-",
+    "reason": "Minutes of meeting"
+  },
+  "CNT-": {
+    "targetKey": "DOC",
+    "targetPrefix": "DOC-",
+    "reason": "Project contact roster and stakeholder governance"
+  },
+  "TEAM-": {
+    "targetKey": "DOC",
+    "targetPrefix": "DOC-",
+    "reason": "Engineering team organization and assignments"
+  }
+};
+
+/**
+ * Default active canonical tracker templates for all projects.
+ */
+export const CANONICAL_TRACKERS: TrackerTemplate[] = CORE_25_TRACKERS;
+
+const CORE_KEY_MAP = new Map<string, CanonicalCategory>();
+const CORE_NAME_MAP = new Map<string, CanonicalCategory>();
+
+CORE_25_TRACKERS.forEach(t => {
+  CORE_KEY_MAP.set(t.key.toUpperCase(), t.category);
+  CORE_NAME_MAP.set(cleanTrackerName(t.name).toLowerCase(), t.category);
+});
+
+/**
+ * Resolves a tracker to one of the 7 engineering groups or Custom Trackers.
  */
 export function getTrackerCategory(t: { category?: string; type?: string; name?: string; key?: string }): CanonicalCategory {
-  // 1. If category is explicitly 'Custom Trackers', preserve it
   if (t.category === 'Custom Trackers') {
     return 'Custom Trackers';
   }
 
-  // 2. If already tagged with one of the standard canonical categories (Groups 1-8)
-  if (t.category && (CANONICAL_CATEGORIES as readonly string[]).includes(t.category) && t.category !== 'Custom Trackers') {
+  // If already tagged with one of the 7 core groups
+  if (t.category && (CORE_25_CATEGORIES as readonly string[]).includes(t.category as any)) {
     return t.category as CanonicalCategory;
   }
 
   const cleanName = cleanTrackerName(t.name || '').toLowerCase();
   const rawKey = (t.key || '').trim().toUpperCase();
 
-  // 3. Exact match against canonical registry
-  const matchByKey = CANONICAL_KEY_MAP.get(rawKey);
+  const matchByKey = CORE_KEY_MAP.get(rawKey);
   if (matchByKey) return matchByKey;
 
-  const matchByName = CANONICAL_NAME_MAP.get(cleanName);
+  const matchByName = CORE_NAME_MAP.get(cleanName);
   if (matchByName) return matchByName;
 
-  // 4. Any newly created, user-defined, or non-canonical tracker strictly routes to Group 9
+  // Check prefix in migration mapping
+  const prefixMatch = Object.entries(MIGRATION_MAPPING).find(([pfx]) => rawKey.startsWith(pfx.replace('-', '')) || (t.key && t.key.includes(pfx.replace('-', ''))));
+  if (prefixMatch) {
+    const target = CORE_25_TRACKERS.find(c => c.key === prefixMatch[1].targetKey);
+    if (target) return target.category;
+  }
+
+  // Fallback for legacy categories
+  if (t.category && (CANONICAL_CATEGORIES as readonly string[]).includes(t.category)) {
+    const cat = t.category;
+    if (cat.includes('Requirements')) return 'Group 2: Requirements Engineering';
+    if (cat.includes('Architecture')) return 'Group 3: Architecture, Design & Components';
+    if (cat.includes('Testing')) return 'Group 5: Verification & Validation';
+    if (cat.includes('Safety') || cat.includes('Risks')) return 'Group 4: Decisions, Safety & Quality';
+    if (cat.includes('Defects')) return 'Group 6: Defect Management';
+    if (cat.includes('Tasks')) return 'Group 7: Task & Change Management';
+    if (cat.includes('Changes') || cat.includes('Releases')) return 'Group 7: Task & Change Management';
+    if (cat.includes('Documents')) return 'Group 1: Project Governance';
+  }
+
   return 'Custom Trackers';
 }
 
-
+/**
+ * Resolves target core tracker template for a given legacy prefix or key.
+ */
+export function getCoreTrackerForLegacyPrefix(prefix: string): TrackerTemplate | undefined {
+  const norm = prefix.endsWith('-') ? prefix : `${prefix}-`;
+  const mapping = MIGRATION_MAPPING[norm];
+  if (!mapping) return undefined;
+  return CORE_25_TRACKERS.find(t => t.key === mapping.targetKey);
+}
 
 /**
- * Creates a complete, independent set of all 101 canonical trackers for a specific project.
+ * Creates the complete set of 25 Consolidated Core Trackers for a project.
  * Guaranteed unique tracker IDs per project: `projectId * 1000 + template.index`
  */
 export function createProjectTrackers(projectId: number, projectKey: string): Tracker[] {
   const upperKey = projectKey.toUpperCase().trim();
-  return CANONICAL_TRACKERS.map(template => {
+  return CORE_25_TRACKERS.map(template => {
     return {
       id: projectId * 1000 + template.index,
       project_id: projectId,
       key: template.key,
-      name: cleanTrackerName(template.name),
+      name: template.name,
       category: template.category,
       type: template.type,
       prefix: `${upperKey}-${template.prefix}`,

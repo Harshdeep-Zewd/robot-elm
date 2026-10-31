@@ -36,7 +36,8 @@ export type ViewMode =
   | 'CHANGES'
   | 'BASELINES'
   | 'ARTIFACTS'
-  | 'AUDIT';
+  | 'AUDIT'
+  | 'REPORTS';
 
 interface SidebarProps {
   trackers: Tracker[];
@@ -609,6 +610,26 @@ export const Sidebar: React.FC<SidebarProps> = ({
       >
         <History size={18} />
         <span>Audit Trail</span>
+      </button>
+
+      <button
+        onClick={() => setActiveView('REPORTS')}
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '10px',
+          padding: '8px 12px',
+          borderRadius: '6px',
+          backgroundColor: activeView === 'REPORTS' ? 'var(--bg-hover)' : 'transparent',
+          color: activeView === 'REPORTS' ? 'var(--accent-cyan)' : 'var(--text-main)',
+          fontSize: '0.85rem',
+          marginBottom: '2px',
+          width: '100%',
+          textAlign: 'left'
+        }}
+      >
+        <FileText size={18} />
+        <span>Engineering Reports (18)</span>
       </button>
 
       {/* Create Custom Tracker Modal */}

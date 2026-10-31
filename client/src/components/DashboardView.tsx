@@ -42,84 +42,75 @@ interface CategoryGroupDef {
 const CATEGORY_GROUPS: CategoryGroupDef[] = [
   {
     id: 1,
-    name: 'Requirements & Verification',
-    color: '#38bdf8',
-    bgColor: 'rgba(56, 189, 248, 0.1)',
-    borderColor: 'rgba(56, 189, 248, 0.28)',
-    icon: FileText,
-    subtitle: 'Customer specifications, functional/system requirements, interface agreements, and verification criteria.'
-  },
-  {
-    id: 2,
-    name: 'Architecture & Hardware',
-    color: '#fbbf24',
-    bgColor: 'rgba(251, 191, 36, 0.1)',
-    borderColor: 'rgba(251, 191, 36, 0.28)',
-    icon: Boxes,
-    subtitle: 'System decomposition, electrical & mechanical designs, communication matrices, and HW/SW interfaces.'
-  },
-  {
-    id: 3,
-    name: 'Testing, Sets & Runs',
-    color: '#10b981',
-    bgColor: 'rgba(16, 185, 129, 0.1)',
-    borderColor: 'rgba(16, 185, 129, 0.28)',
-    icon: FlaskConical,
-    subtitle: 'Test strategies, qualification plans, test cases with steps, test configurations, test sets, and runs.'
-  },
-  {
-    id: 4,
-    name: 'Safety & Risks',
-    color: '#f43f5e',
-    bgColor: 'rgba(244, 63, 94, 0.1)',
-    borderColor: 'rgba(244, 63, 94, 0.28)',
-    icon: ShieldAlert,
-    subtitle: 'Functional safety management plans, ISO 13482 safety cases, ASIL hazard matrices, and QA gates.'
-  },
-  {
-    id: 5,
-    name: 'Defects & Problems',
-    color: '#ef4444',
-    bgColor: 'rgba(239, 68, 68, 0.1)',
-    borderColor: 'rgba(239, 68, 68, 0.28)',
-    icon: AlertTriangle,
-    subtitle: 'Defect logging, hardware failures, software bugs, Octane sync tickets, and root cause analysis.'
-  },
-  {
-    id: 6,
-    name: 'Tasks & Epics',
-    color: '#818cf8',
-    bgColor: 'rgba(129, 140, 248, 0.1)',
-    borderColor: 'rgba(129, 140, 248, 0.28)',
-    icon: CheckSquare,
-    subtitle: 'Multi-sprint engineering epics, hardware/software development tasks, QA action items, and work packages.'
-  },
-  {
-    id: 7,
-    name: 'Changes & Releases',
-    color: '#c084fc',
-    bgColor: 'rgba(192, 132, 252, 0.1)',
-    borderColor: 'rgba(192, 132, 252, 0.28)',
-    icon: GitBranch,
-    subtitle: 'Engineering change requests (ECR), component BOMs, hardware revisions, and commercial system releases.'
-  },
-  {
-    id: 8,
-    name: 'Documents & Governance',
+    name: 'Group 1: Project Governance',
     color: '#94a3b8',
     bgColor: 'rgba(148, 163, 184, 0.1)',
     borderColor: 'rgba(148, 163, 184, 0.28)',
     icon: FolderArchive,
-    subtitle: 'Normative reference standards, minutes of meeting (MoM), stakeholder directories, and project RACI teams.'
+    subtitle: 'Systems engineering strategy, controlled engineering documents, specifications, and formal minutes of meeting (MOM).'
   },
   {
-    id: 9,
+    id: 2,
+    name: 'Group 2: Requirements Engineering',
+    color: '#38bdf8',
+    bgColor: 'rgba(56, 189, 248, 0.1)',
+    borderColor: 'rgba(56, 189, 248, 0.28)',
+    icon: FileText,
+    subtitle: 'Stakeholder requirements, system requirements, hardware requirements, and software requirements with mandatory Safety Level.'
+  },
+  {
+    id: 3,
+    name: 'Group 3: Architecture, Design & Components',
+    color: '#fbbf24',
+    bgColor: 'rgba(251, 191, 36, 0.1)',
+    borderColor: 'rgba(251, 191, 36, 0.28)',
+    icon: Boxes,
+    subtitle: 'System architecture (SAD), subsystem designs (SUBD), interface control documents (ICD), and hierarchical Bill of Materials (CMP).'
+  },
+  {
+    id: 4,
+    name: 'Group 4: Decisions, Safety & Quality',
+    color: '#f43f5e',
+    bgColor: 'rgba(244, 63, 94, 0.1)',
+    borderColor: 'rgba(244, 63, 94, 0.28)',
+    icon: ShieldAlert,
+    subtitle: 'Architecture decision records (ADR), ISO 13482 risk register, product safety plan & case, and quality requirements.'
+  },
+  {
+    id: 5,
+    name: 'Group 5: Verification & Validation',
+    color: '#10b981',
+    bgColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.28)',
+    icon: FlaskConical,
+    subtitle: 'V&V plans (VVP), universal test cases (TC), test configurations (TCFG), test sets (TSET), test runs (TRUN), and test reports (TREP).'
+  },
+  {
+    id: 6,
+    name: 'Group 6: Defect Management',
+    color: '#ef4444',
+    bgColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.28)',
+    icon: AlertTriangle,
+    subtitle: 'Hardware faults, software bugs, integration anomalies, and failed execution tickets with root cause and retest verification.'
+  },
+  {
+    id: 7,
+    name: 'Group 7: Task & Change Management',
+    color: '#c084fc',
+    bgColor: 'rgba(192, 132, 252, 0.1)',
+    borderColor: 'rgba(192, 132, 252, 0.28)',
+    icon: GitBranch,
+    subtitle: 'Engineering tasks & epics, formal change requests with impact assessment, and configuration release baselines.'
+  },
+  {
+    id: 8,
     name: 'Custom Trackers',
     color: '#f97316',
     bgColor: 'rgba(249, 115, 22, 0.1)',
     borderColor: 'rgba(249, 115, 22, 0.28)',
     icon: Sparkles,
-    subtitle: 'User-created custom engineering trackers, special inspection modules, and project-specific repositories.'
+    subtitle: 'User-created custom engineering trackers, special inspection modules, and project-specific extensions.'
   }
 ];
 
