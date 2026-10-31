@@ -378,7 +378,8 @@ export interface Artifact {
   project_id?: number;
   object_id?: number;
   filename: string;
-  stored_path: string;
+  file_name?: string;
+  stored_path?: string;
   file_size: number;
   mime_type: string;
   category: 'CAD' | 'ROS_BAG' | 'LOG' | 'CSV' | 'PDF' | 'IMAGE' | 'OTHER';

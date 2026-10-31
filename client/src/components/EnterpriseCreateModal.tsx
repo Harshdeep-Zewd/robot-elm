@@ -98,7 +98,7 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
   };
 
   const isRequirement = tracker.type === 'REQUIREMENT' || tracker.key.includes('REQ') || ['STK-REQ', 'SYS-REQ', 'HW-REQ', 'SW-REQ', 'QREQ'].includes(tracker.key);
-  const isTestCase = tracker.type === 'TEST_CASE' || tracker.key === 'TC' || tracker.prefix.includes('TC-');
+  const isTestCase = Boolean(tracker.enable_test_steps) || tracker.type === 'TEST_CASE' || tracker.key === 'TC' || tracker.key === 'SYS-TST' || tracker.prefix.includes('TC-') || tracker.prefix.includes('TST-');
 
   const handleSaveInternal = (closeAfter: boolean) => {
     if (!title.trim()) {
@@ -169,8 +169,6 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
       resetForm();
     }
   };
-
-  const isTestCase = tracker.enable_test_steps ?? (tracker.type === 'TEST_CASE' || tracker.key === 'SYS-TST' || tracker.prefix.includes('TST-'));
 
   return (
     <div style={{

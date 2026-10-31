@@ -1391,11 +1391,12 @@ CANONICAL_KEY_MAP.set('SYSTST', 'Testing, Sets & Runs');
 CANONICAL_KEY_MAP.set('TST-SET', 'Testing, Sets & Runs');
 CANONICAL_KEY_MAP.set('TSTSET', 'Testing, Sets & Runs');
 
+export const CANONICAL_TRACKERS: TrackerTemplate[] = CORE_25_TRACKERS;
+
 for (const ct of CANONICAL_TRACKERS) {
   CANONICAL_KEY_MAP.set(ct.key.toUpperCase(), ct.category);
   CANONICAL_NAME_MAP.set(cleanTrackerName(ct.name).toLowerCase(), ct.category);
 }
-];
 
 /**
  * Migration Mapping Registry from the 101 legacy tracker prefixes to the 25 core trackers.
@@ -1947,11 +1948,6 @@ export const MIGRATION_MAPPING: Record<string, { targetKey: string; targetPrefix
     "reason": "Engineering team organization and assignments"
   }
 };
-
-/**
- * Default active canonical tracker templates for all projects.
- */
-export const CANONICAL_TRACKERS: TrackerTemplate[] = CORE_25_TRACKERS;
 
 const CORE_KEY_MAP = new Map<string, CanonicalCategory>();
 const CORE_NAME_MAP = new Map<string, CanonicalCategory>();

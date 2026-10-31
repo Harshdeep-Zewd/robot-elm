@@ -298,7 +298,9 @@ export function buildDemoArtifacts(): Artifact[] {
       object_id: 1000011,
       object_key: 'DEMO-DOC-001',
       object_title: 'ISO 13482 Service Robot Safety Compliance Dossier',
+      filename: 'RoboServ_ISO13482_Compliance_Dossier.pdf',
       file_name: 'RoboServ_ISO13482_Compliance_Dossier.pdf',
+      stored_path: '/uploads/RoboServ_ISO13482_Compliance_Dossier.pdf',
       file_size: 3840000,
       mime_type: 'application/pdf',
       category: 'PDF',
@@ -311,7 +313,9 @@ export function buildDemoArtifacts(): Artifact[] {
       object_id: 1000021,
       object_key: 'DEMO-CAD-001',
       object_title: 'Chassis & Payload Suspension 3D CAD Assembly',
+      filename: 'RoboServ_Chassis_Assembly_Rev4.step',
       file_name: 'RoboServ_Chassis_Assembly_Rev4.step',
+      stored_path: '/uploads/RoboServ_Chassis_Assembly_Rev4.step',
       file_size: 18500000,
       mime_type: 'application/octet-stream',
       category: 'CAD',
@@ -337,13 +341,13 @@ export function buildDemoRelationships(objects: EngineeringObject[]): Relationsh
   const demoTestSets = objects.filter(o =>
     o.type === 'TEST_SET' ||
     o.object_key.includes('SET') ||
-    o.tracker_name.toLowerCase().includes('test set')
+    (o.tracker_name ? o.tracker_name.toLowerCase().includes('test set') : false)
   );
   const demoTestCases = objects.filter(o =>
     o.type === 'TEST_CASE' ||
     o.object_key.includes('TST') ||
     o.object_key.includes('TC') ||
-    o.tracker_name.toLowerCase().includes('test case')
+    (o.tracker_name ? o.tracker_name.toLowerCase().includes('test case') : false)
   );
 
   if (demoTestSets.length > 0 && demoTestCases.length > 0) {

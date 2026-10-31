@@ -2149,7 +2149,7 @@ export const App: React.FC = () => {
               relationships={relationships}
               testRuns={testRuns}
               artifacts={currentProjectArtifacts}
-              onNavigateToTracker={(t) => { setSelectedTracker(t); setActiveView('TRACKER'); }}
+              onNavigateToTracker={(t) => { setSelectedTrackerId(t.id); setActiveView('TRACKER'); }}
               onTriggerMigration={handleExecuteMigration}
             />
           )}
