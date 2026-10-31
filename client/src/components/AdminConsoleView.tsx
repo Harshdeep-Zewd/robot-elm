@@ -104,7 +104,9 @@ export const AdminConsoleView: React.FC<AdminConsoleViewProps> = ({
       if (onDeleteProject) {
         onDeleteProject(p.id);
       }
-      refreshAll();
+      setUsers(authService.getUsers());
+      setProjectRequests(authService.getProjectRequests());
+      setTrackerRequests(authService.getTrackerRequests());
     }
   };
 

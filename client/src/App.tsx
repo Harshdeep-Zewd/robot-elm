@@ -510,14 +510,23 @@ export const isDemoProject = (p: any): boolean => {
   return p.id === DEMO_PROJECT.id || p.id === 100 || (typeof p.key === 'string' && p.key.trim().toUpperCase() === 'DEMO');
 };
 
+export const getDeletedProjectIds = (): number[] => {
+  try {
+    const raw = localStorage.getItem('roboserv_elm_deleted_project_ids');
+    if (raw) return JSON.parse(raw);
+  } catch (e) {}
+  return [];
+};
+
 export const getNonDemoProjects = (): Project[] => {
+  const deletedIds = getDeletedProjectIds();
   const loaded = getInitialData<Project[]>('projects', INITIAL_PROJECTS);
   const cleaned = Array.isArray(loaded)
-    ? loaded.filter(p => !isDemoProject(p))
+    ? loaded.filter(p => p && !isDemoProject(p) && !deletedIds.includes(p.id))
     : [];
 
   for (const initP of INITIAL_PROJECTS) {
-    if (!cleaned.some(p => p.id === initP.id || p.key.toUpperCase() === initP.key.toUpperCase())) {
+    if (!deletedIds.includes(initP.id) && !cleaned.some(p => p.id === initP.id || p.key.toUpperCase() === initP.key.toUpperCase())) {
       cleaned.push(initP);
     }
   }
@@ -525,9 +534,11 @@ export const getNonDemoProjects = (): Project[] => {
 };
 
 export const getNonDemoTrackers = (): Tracker[] => {
+  const currentProjs = getNonDemoProjects();
+  const validProjectIds = currentProjs.map(p => p.id);
   const rawTrackers = getInitialData<Tracker[]>('trackers', INITIAL_TRACKERS);
   const nonDemoTrackers = Array.isArray(rawTrackers)
-    ? rawTrackers.filter(t => t && t.project_id !== DEMO_PROJECT.id && t.project_id !== 100)
+    ? rawTrackers.filter(t => t && t.project_id !== DEMO_PROJECT.id && t.project_id !== 100 && validProjectIds.includes(t.project_id))
     : [];
 
   const isRemoved = (t: { key?: string; name?: string }) => {
@@ -552,7 +563,6 @@ export const getNonDemoTrackers = (): Tracker[] => {
     }));
 
   const merged = [...sanitized];
-  const currentProjs = getNonDemoProjects();
   for (const proj of currentProjs) {
     const projTrackers = merged.filter(t => t.project_id === proj.id);
     if (projTrackers.length < CANONICAL_TRACKERS.length) {
@@ -578,14 +588,18 @@ export const getNonDemoTrackers = (): Tracker[] => {
 };
 
 export const getNonDemoObjects = (): EngineeringObject[] => {
+  const currentProjs = getNonDemoProjects();
+  const currentTrackers = getNonDemoTrackers();
+  const validTrackerIds = currentTrackers.map(t => t.id);
+
   const loaded = getInitialData<EngineeringObject[]>('objects', INITIAL_OBJECTS);
   const filtered = Array.isArray(loaded)
-    ? loaded.filter(obj => obj && obj.id < 90000 && !String(obj.object_key).startsWith('DEMO-'))
+    ? loaded.filter(obj => obj && !String(obj.object_key).startsWith('DEMO-') && (obj.tracker_id < 100000 || obj.tracker_id >= 101000) && (validTrackerIds.length === 0 || validTrackerIds.includes(obj.tracker_id)))
     : [];
 
   const merged = [...filtered];
   for (const initObj of INITIAL_OBJECTS) {
-    if (!merged.some(o => o.id === initObj.id)) {
+    if (validTrackerIds.includes(initObj.tracker_id) && !merged.some(o => o.id === initObj.id)) {
       merged.push(initObj);
     }
   }
@@ -604,11 +618,13 @@ export const getNonDemoObjects = (): EngineeringObject[] => {
 };
 
 export const getNonDemoTestRuns = (): TestRun[] => {
+  const currentProjs = getNonDemoProjects();
+  const validProjectIds = currentProjs.map(p => p.id);
   const loaded = getInitialData<TestRun[]>('test_runs', INITIAL_TEST_RUNS);
   const filtered = Array.isArray(loaded)
-    ? loaded.filter(r => r && r.project_id !== DEMO_PROJECT.id && r.project_id !== 100)
+    ? loaded.filter(r => r && r.project_id !== DEMO_PROJECT.id && r.project_id !== 100 && validProjectIds.includes(r.project_id))
     : [];
-  return filtered.length > 0 ? filtered : INITIAL_TEST_RUNS;
+  return filtered;
 };
 
 export const App: React.FC = () => {
@@ -1067,7 +1083,7 @@ export const App: React.FC = () => {
   }, [allFolders, currentUser]);
   useEffect(() => {
     if (!currentUser || currentUser.username === 'demo') return;
-    const toSave = allObjects.filter(o => o.id < 90000 && !String(o.object_key).startsWith('DEMO-'));
+    const toSave = allObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000));
     localStorage.setItem('roboserv_elm_objects', JSON.stringify(toSave));
   }, [allObjects, currentUser]);
   useEffect(() => {
@@ -1240,12 +1256,30 @@ export const App: React.FC = () => {
 
     const newTrackers: Tracker[] = createProjectTrackers(newProjectId, upperKey);
 
-    setProjects(prev => [newProject, ...prev]);
-    setAllTrackers(prev => [...prev, ...newTrackers]);
+    const nextProjects = [newProject, ...projects];
+    const nextTrackers = [...allTrackers, ...newTrackers];
+
+    // Remove from deleted list if previously present
+    const deletedIds = getDeletedProjectIds().filter(did => did !== newProjectId);
+    try {
+      localStorage.setItem('roboserv_elm_deleted_project_ids', JSON.stringify(deletedIds));
+    } catch (e) {}
+
+    setProjects(nextProjects);
+    setAllTrackers(nextTrackers);
     setActiveProjectId(newProjectId);
     setSelectedTrackerId(newTrackers[0].id);
     setActiveView('DASHBOARD');
     setCurrentScreen('WORKSPACE');
+
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_projects', JSON.stringify(nextProjects.filter(p => !isDemoProject(p))));
+        localStorage.setItem('roboserv_elm_active_project_id', JSON.stringify(newProjectId));
+        localStorage.setItem('roboserv_elm_trackers', JSON.stringify(nextTrackers.filter(t => t.project_id !== DEMO_PROJECT.id && t.project_id !== 100)));
+      } catch (e) {}
+    }
+
     try {
       const url = new URL(window.location.href);
       url.searchParams.set('project', upperKey.toLowerCase());
@@ -1254,7 +1288,13 @@ export const App: React.FC = () => {
   };
 
   const handleUpdateProject = (id: number, updates: Partial<Project>) => {
-    setProjects(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
+    const nextProjects = projects.map(p => p.id === id ? { ...p, ...updates } : p);
+    setProjects(nextProjects);
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_projects', JSON.stringify(nextProjects.filter(p => !isDemoProject(p))));
+      } catch (e) {}
+    }
   };
 
   const handleDeleteProject = (id: number) => {
@@ -1263,28 +1303,70 @@ export const App: React.FC = () => {
       return;
     }
 
+    // Persist deleted project ID so it never reappears on reload
+    const deletedIds = getDeletedProjectIds();
+    if (!deletedIds.includes(id)) {
+      deletedIds.push(id);
+      try {
+        localStorage.setItem('roboserv_elm_deleted_project_ids', JSON.stringify(deletedIds));
+      } catch (e) {}
+    }
+
     const pTrackers = allTrackers.filter(t => t.project_id === id);
     const pTrackerIds = pTrackers.map(t => t.id);
     const pObjects = allObjects.filter(o => pTrackerIds.includes(o.tracker_id));
     const pObjIds = pObjects.map(o => o.id);
 
-    setProjects(prev => prev.filter(p => p.id !== id));
-    setAllTrackers(prev => prev.filter(t => !pTrackerIds.includes(t.id)));
-    setAllFolders(prev => prev.filter(f => !pTrackerIds.includes(f.tracker_id)));
-    setAllObjects(prev => prev.filter(o => !pTrackerIds.includes(o.tracker_id)));
-    setRelationships(prev => prev.filter(r => !pObjIds.includes(r.source_id) && !pObjIds.includes(r.target_id)));
-    setTestSteps(prev => prev.filter(s => !pObjIds.includes(s.test_case_id)));
-    setArtifacts(prev => prev.filter(a => !pObjIds.includes(a.object_id || -1)));
+    const nextProjects = projects.filter(p => p.id !== id);
+    const nextTrackers = allTrackers.filter(t => !pTrackerIds.includes(t.id));
+    const nextFolders = allFolders.filter(f => !pTrackerIds.includes(f.tracker_id));
+    const nextObjects = allObjects.filter(o => !pTrackerIds.includes(o.tracker_id));
+    const nextRelationships = relationships.filter(r => !pObjIds.includes(r.source_id) && !pObjIds.includes(r.target_id));
+    const nextTestSteps = testSteps.filter(s => !pObjIds.includes(s.test_case_id));
+    const nextArtifacts = artifacts.filter(a => !pObjIds.includes(a.object_id || -1));
+    const nextTestRuns = testRuns.filter(r => r.project_id !== id);
 
+    setProjects(nextProjects);
+    setAllTrackers(nextTrackers);
+    setAllFolders(nextFolders);
+    setAllObjects(nextObjects);
+    setRelationships(nextRelationships);
+    setTestSteps(nextTestSteps);
+    setArtifacts(nextArtifacts);
+    setTestRuns(nextTestRuns);
+
+    let nextActiveId = activeProjectId;
     if (activeProjectId === id) {
-      const remainingProjects = projects.filter(p => p.id !== id);
-      const nextProject = remainingProjects[0];
-      if (nextProject) {
-        setActiveProjectId(nextProject.id);
-        const nextTrackers = allTrackers.filter(t => t.project_id === nextProject.id);
-        setSelectedTrackerId(nextTrackers[0]?.id || null);
-      }
+      nextActiveId = nextProjects[0]?.id || 1;
+      setActiveProjectId(nextActiveId);
+      const nextTrackersForProj = nextTrackers.filter(t => t.project_id === nextActiveId);
+      setSelectedTrackerId(nextTrackersForProj[0]?.id || null);
     }
+
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_projects', JSON.stringify(nextProjects.filter(p => !isDemoProject(p))));
+        localStorage.setItem('roboserv_elm_active_project_id', JSON.stringify(nextActiveId));
+        localStorage.setItem('roboserv_elm_trackers', JSON.stringify(nextTrackers.filter(t => t.project_id !== DEMO_PROJECT.id && t.project_id !== 100)));
+        localStorage.setItem('roboserv_elm_folders', JSON.stringify(nextFolders));
+        localStorage.setItem('roboserv_elm_objects', JSON.stringify(nextObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000))));
+        localStorage.setItem('roboserv_elm_relationships', JSON.stringify(nextRelationships));
+        localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(nextTestSteps));
+        localStorage.setItem('roboserv_elm_artifacts', JSON.stringify(nextArtifacts));
+        localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(nextTestRuns.filter(r => r.project_id !== DEMO_PROJECT.id && r.project_id !== 100)));
+      } catch (e) {}
+    }
+
+    // Clean up URL if it pointed to the deleted project
+    try {
+      const url = new URL(window.location.href);
+      const projParam = url.searchParams.get('project');
+      const targetProj = projects.find(p => p.id === id);
+      if (projParam && (projParam.toLowerCase() === String(id) || projParam.toLowerCase() === targetProj?.key.toLowerCase())) {
+        url.searchParams.delete('project');
+        window.history.replaceState({}, '', url.toString());
+      }
+    } catch (e) {}
   };
 
   const handleCreateTracker = (data: {
@@ -1315,23 +1397,48 @@ export const App: React.FC = () => {
       description: data.description || ''
     };
 
-    setAllTrackers(prev => [...prev, newTracker]);
+    const nextTrackers = [...allTrackers, newTracker];
+    setAllTrackers(nextTrackers);
     setSelectedTrackerId(newTrackerId);
     setActiveView('TRACKER');
+
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_trackers', JSON.stringify(nextTrackers.filter(t => t.project_id !== DEMO_PROJECT.id && t.project_id !== 100)));
+      } catch (e) {}
+    }
   };
 
   const handleDeleteTracker = (trackerId: number) => {
-    setAllTrackers(prev => prev.filter(t => t.id !== trackerId));
+    const nextTrackers = allTrackers.filter(t => t.id !== trackerId);
     const trackerObjIds = allObjects.filter(o => o.tracker_id === trackerId).map(o => o.id);
-    setAllObjects(prev => prev.filter(o => o.tracker_id !== trackerId));
-    setRelationships(prev => prev.filter(r => !trackerObjIds.includes(r.source_id) && !trackerObjIds.includes(r.target_id)));
-    setTestSteps(prev => prev.filter(s => !trackerObjIds.includes(s.test_case_id)));
-    setArtifacts(prev => prev.filter(a => !trackerObjIds.includes(a.object_id || -1)));
-    setAllFolders(prev => prev.filter(f => f.tracker_id !== trackerId));
+    const nextObjects = allObjects.filter(o => o.tracker_id !== trackerId);
+    const nextRelationships = relationships.filter(r => !trackerObjIds.includes(r.source_id) && !trackerObjIds.includes(r.target_id));
+    const nextTestSteps = testSteps.filter(s => !trackerObjIds.includes(s.test_case_id));
+    const nextArtifacts = artifacts.filter(a => !trackerObjIds.includes(a.object_id || -1));
+    const nextFolders = allFolders.filter(f => f.tracker_id !== trackerId);
+
+    setAllTrackers(nextTrackers);
+    setAllObjects(nextObjects);
+    setRelationships(nextRelationships);
+    setTestSteps(nextTestSteps);
+    setArtifacts(nextArtifacts);
+    setAllFolders(nextFolders);
     
     if (selectedTrackerId === trackerId) {
-      const remaining = allTrackers.filter(t => t.id !== trackerId && t.project_id === activeProjectId);
+      const remaining = nextTrackers.filter(t => t.project_id === activeProjectId);
       setSelectedTrackerId(remaining[0]?.id || null);
+    }
+
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_trackers', JSON.stringify(nextTrackers.filter(t => t.project_id !== DEMO_PROJECT.id && t.project_id !== 100)));
+        localStorage.setItem('roboserv_elm_objects', JSON.stringify(nextObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000))));
+        localStorage.setItem('roboserv_elm_relationships', JSON.stringify(nextRelationships));
+        localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(nextTestSteps));
+        localStorage.setItem('roboserv_elm_artifacts', JSON.stringify(nextArtifacts));
+        localStorage.setItem('roboserv_elm_folders', JSON.stringify(nextFolders));
+      } catch (e) {}
     }
   };
 
@@ -1413,7 +1520,14 @@ export const App: React.FC = () => {
       updated_at: new Date().toISOString()
     };
 
-    setAllObjects(prev => [newObj, ...prev]);
+    const nextObjects = [newObj, ...allObjects];
+    setAllObjects(nextObjects);
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        const toSave = nextObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000));
+        localStorage.setItem('roboserv_elm_objects', JSON.stringify(toSave));
+      } catch (e) {}
+    }
 
     // Add Initial Test Step for Test Cases
     if (data.test_step_action && data.test_step_expected) {
@@ -1424,7 +1538,13 @@ export const App: React.FC = () => {
         action: data.test_step_action.trim(),
         expected_result: data.test_step_expected.trim()
       };
-      setTestSteps(prev => [...prev, initialStep]);
+      const nextSteps = [...testSteps, initialStep];
+      setTestSteps(nextSteps);
+      if (currentUser && currentUser.username !== 'demo') {
+        try {
+          localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(nextSteps));
+        } catch (e) {}
+      }
     }
 
     // Auto-link selected test cases to Test Set
@@ -1435,13 +1555,19 @@ export const App: React.FC = () => {
         target_id: newObjId,
         relationship_type: 'INCLUDED_IN'
       }));
-      setRelationships(prev => [...prev, ...newRels]);
+      const nextRels = [...relationships, ...newRels];
+      setRelationships(nextRels);
+      if (currentUser && currentUser.username !== 'demo') {
+        try {
+          localStorage.setItem('roboserv_elm_relationships', JSON.stringify(nextRels));
+        } catch (e) {}
+      }
     }
     return newObjId;
   };
 
   const handleUpdateObject = (id: number, updates: Partial<EngineeringObject>) => {
-    setAllObjects(prev => prev.map(o => {
+    const nextObjects = allObjects.map(o => {
       if (o.id === id) {
         return {
           ...o,
@@ -1453,14 +1579,36 @@ export const App: React.FC = () => {
         };
       }
       return o;
-    }));
+    });
+    setAllObjects(nextObjects);
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        const toSave = nextObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000));
+        localStorage.setItem('roboserv_elm_objects', JSON.stringify(toSave));
+      } catch (e) {}
+    }
   };
 
   const handleDeleteObject = (id: number) => {
-    setAllObjects(prev => prev.filter(o => o.id !== id));
-    setRelationships(prev => prev.filter(r => r.source_id !== id && r.target_id !== id));
-    setTestSteps(prev => prev.filter(s => s.test_case_id !== id));
-    setArtifacts(prev => prev.filter(a => a.object_id !== id));
+    const nextObjects = allObjects.filter(o => o.id !== id);
+    const nextRelationships = relationships.filter(r => r.source_id !== id && r.target_id !== id);
+    const nextTestSteps = testSteps.filter(s => s.test_case_id !== id);
+    const nextArtifacts = artifacts.filter(a => a.object_id !== id);
+
+    setAllObjects(nextObjects);
+    setRelationships(nextRelationships);
+    setTestSteps(nextTestSteps);
+    setArtifacts(nextArtifacts);
+
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        const toSave = nextObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000));
+        localStorage.setItem('roboserv_elm_objects', JSON.stringify(toSave));
+        localStorage.setItem('roboserv_elm_relationships', JSON.stringify(nextRelationships));
+        localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(nextTestSteps));
+        localStorage.setItem('roboserv_elm_artifacts', JSON.stringify(nextArtifacts));
+      } catch (e) {}
+    }
   };
 
   const handleAddRelationship = (source_id: number, target_id: number, relationship_type: any) => {
@@ -1470,11 +1618,23 @@ export const App: React.FC = () => {
       target_id,
       relationship_type
     };
-    setRelationships(prev => [...prev, newRel]);
+    const nextRels = [...relationships, newRel];
+    setRelationships(nextRels);
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_relationships', JSON.stringify(nextRels));
+      } catch (e) {}
+    }
   };
 
   const handleDeleteRelationship = (id: number) => {
-    setRelationships(prev => prev.filter(r => r.id !== id));
+    const nextRels = relationships.filter(r => r.id !== id);
+    setRelationships(nextRels);
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_relationships', JSON.stringify(nextRels));
+      } catch (e) {}
+    }
   };
 
   const handleAddTestStep = (test_case_id: number, action: string, expected_result: string) => {
@@ -1486,11 +1646,23 @@ export const App: React.FC = () => {
       action: action.trim(),
       expected_result: expected_result.trim()
     };
-    setTestSteps(prev => [...prev, newStep]);
+    const nextSteps = [...testSteps, newStep];
+    setTestSteps(nextSteps);
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(nextSteps));
+      } catch (e) {}
+    }
   };
 
   const handleDeleteTestStep = (id: number) => {
-    setTestSteps(prev => prev.filter(s => s.id !== id));
+    const nextSteps = testSteps.filter(s => s.id !== id);
+    setTestSteps(nextSteps);
+    if (currentUser && currentUser.username !== 'demo') {
+      try {
+        localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(nextSteps));
+      } catch (e) {}
+    }
   };
 
   // Artifact & File Attachment Handlers
