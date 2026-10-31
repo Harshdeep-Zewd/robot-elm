@@ -16,6 +16,9 @@ interface HeaderProps {
   onLogout: () => void;
   onOpenAdminConsole?: () => void;
   onBackToProjects?: () => void;
+  syncStatus?: 'IDLE' | 'SYNCING' | 'SYNCED' | 'ERROR';
+  lastSyncedAt?: string | null;
+  onForceSync?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -30,7 +33,10 @@ export const Header: React.FC<HeaderProps> = ({
   setSearchQuery,
   onLogout,
   onOpenAdminConsole,
-  onBackToProjects
+  onBackToProjects,
+  syncStatus = 'SYNCED',
+  lastSyncedAt,
+  onForceSync
 }) => {
   const [showDropdown, setShowDropdown] = useState(false);
   
@@ -345,7 +351,38 @@ export const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+        {/* Cloud Sync Status Indicator for Non-Demo */}
+        {currentUser?.username !== 'demo' && (
+          <button
+            onClick={onForceSync}
+            title={syncStatus === 'SYNCING' ? 'Synchronizing globally across all browsers...' : `Global Cloud Synchronized (${lastSyncedAt || 'Live'}). Click to sync now.`}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '4px 10px',
+              borderRadius: '20px',
+              backgroundColor: syncStatus === 'ERROR' ? 'rgba(239, 68, 68, 0.15)' : (syncStatus === 'SYNCING' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(16, 185, 129, 0.12)'),
+              border: `1px solid ${syncStatus === 'ERROR' ? 'rgba(239, 68, 68, 0.4)' : (syncStatus === 'SYNCING' ? 'rgba(56, 189, 248, 0.4)' : 'rgba(16, 185, 129, 0.35)')}`,
+              color: syncStatus === 'ERROR' ? '#f87171' : (syncStatus === 'SYNCING' ? '#38bdf8' : '#34d399'),
+              fontSize: '0.75rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <span style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              backgroundColor: syncStatus === 'SYNCING' ? '#38bdf8' : (syncStatus === 'ERROR' ? '#ef4444' : '#10b981'),
+              boxShadow: syncStatus === 'SYNCING' ? '0 0 8px #38bdf8' : '0 0 6px #10b981'
+            }} />
+            {syncStatus === 'SYNCING' ? 'Syncing...' : (syncStatus === 'ERROR' ? 'Sync Error' : `Global Synced ${lastSyncedAt ? '• ' + lastSyncedAt : ''}`)}
+          </button>
+        )}
+
         {/* Search Input */}
         <div style={{ position: 'relative', width: '240px' }}>
           <Search size={16} style={{ position: 'absolute', left: '10px', top: '10px', color: 'var(--text-muted)' }} />

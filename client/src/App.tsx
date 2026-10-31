@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Sidebar, ViewMode } from './components/Sidebar';
 import { DashboardView } from './components/DashboardView';
@@ -15,6 +15,7 @@ import { AdminConsoleView } from './components/AdminConsoleView';
 import { ProjectsPortalView } from './components/ProjectsPortalView';
 import { EngineeringReportsView } from './components/EngineeringReportsView';
 import { executeProjectMigration } from './utils/trackerMigration';
+import { fetchGlobalStateFromCloud, pushGlobalStateToCloud, mergeLocalAndCloudState, WorkspaceSyncState } from './utils/cloudSync';
 import { Project, Tracker, EngineeringObject, Folder, RequirementType, SafetyLevel, TestSubProcess, Relationship, TestStep, Artifact, User, TestRun } from './types/elm';
 import { authService } from './api/auth';
 import { CANONICAL_TRACKERS, createProjectTrackers, cleanTrackerName, getTrackerCategory } from './data/canonicalTrackers';
@@ -844,6 +845,274 @@ export const App: React.FC = () => {
     } catch (e) {}
     return null;
   });
+
+  // Global Cross-Browser & Cross-PC Cloud Synchronization States
+  const [syncStatus, setSyncStatus] = useState<'IDLE' | 'SYNCING' | 'SYNCED' | 'ERROR'>('IDLE');
+  const [lastSyncedAt, setLastSyncedAt] = useState<string | null>(null);
+  const isInitialSyncDoneRef = useRef<boolean>(false);
+  const isApplyingCloudSyncRef = useRef<boolean>(false);
+  const syncDebounceTimerRef = useRef<any>(null);
+
+  // 1. Initial Hydration from Global Cloud Store (Runs on Mount / Login for Non-Demo)
+  useEffect(() => {
+    if (!currentUser || currentUser.username === 'demo') return;
+
+    let isMounted = true;
+    const hydrateFromCloud = async () => {
+      try {
+        setSyncStatus('SYNCING');
+        const cloudState = await fetchGlobalStateFromCloud(currentUser.username || 'zewd');
+
+        // Read current local state
+        const localProjects = getNonDemoProjects();
+        const localTrackers = getNonDemoTrackers();
+        const localFolders = getInitialData('folders', INITIAL_FOLDERS);
+        const localObjects = getNonDemoObjects();
+        const localRelationships = getInitialData('relationships', INITIAL_RELATIONSHIPS);
+        const localTestSteps = getInitialData('test_steps', INITIAL_TEST_STEPS);
+        const localArtifacts = getInitialData('artifacts', INITIAL_ARTIFACTS);
+        const localTestRuns = getNonDemoTestRuns();
+        const localRunDetails = getInitialData('test_run_details', INITIAL_TEST_RUN_DETAILS);
+        const deletedProjectIds = getDeletedProjectIds();
+
+        const localBundle: WorkspaceSyncState = {
+          projects: localProjects,
+          deletedProjectIds,
+          activeProjectId,
+          allTrackers: localTrackers,
+          selectedTrackerId,
+          allFolders: localFolders,
+          allObjects: localObjects,
+          relationships: localRelationships,
+          testSteps: localTestSteps,
+          artifacts: localArtifacts,
+          testRuns: localTestRuns,
+          testRunDetailsMap: localRunDetails,
+          lastUpdated: new Date().toISOString(),
+          updatedBy: currentUser.username || 'zewd'
+        };
+
+        const { merged, hasLocalAdditions } = mergeLocalAndCloudState(localBundle, cloudState);
+
+        if (!isMounted) return;
+
+        isApplyingCloudSyncRef.current = true;
+        setProjects(merged.projects);
+        setAllTrackers(merged.allTrackers);
+        setAllFolders(merged.allFolders);
+        setAllObjects(merged.allObjects);
+        setRelationships(merged.relationships);
+        setTestSteps(merged.testSteps);
+        setArtifacts(merged.artifacts);
+        setTestRuns(merged.testRuns);
+        setTestRunDetailsMap(merged.testRunDetailsMap);
+
+        // Update local cache
+        try {
+          localStorage.setItem('roboserv_elm_projects', JSON.stringify(merged.projects));
+          localStorage.setItem('roboserv_elm_deleted_project_ids', JSON.stringify(merged.deletedProjectIds));
+          localStorage.setItem('roboserv_elm_trackers', JSON.stringify(merged.allTrackers));
+          localStorage.setItem('roboserv_elm_folders', JSON.stringify(merged.allFolders));
+          localStorage.setItem('roboserv_elm_objects', JSON.stringify(merged.allObjects));
+          localStorage.setItem('roboserv_elm_relationships', JSON.stringify(merged.relationships));
+          localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(merged.testSteps));
+          localStorage.setItem('roboserv_elm_artifacts', JSON.stringify(merged.artifacts));
+          localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(merged.testRuns));
+          localStorage.setItem('roboserv_elm_test_run_details', JSON.stringify(merged.testRunDetailsMap));
+        } catch (e) {}
+
+        // If local browser had additions (such as Demo_Check_1 created in Chrome before sync)
+        // or if cloud was empty, publish full merged state to the cloud so all other browsers get it!
+        if (hasLocalAdditions || !cloudState) {
+          await pushGlobalStateToCloud(merged, currentUser.username || 'zewd');
+        }
+
+        setSyncStatus('SYNCED');
+        setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+        isInitialSyncDoneRef.current = true;
+        setTimeout(() => { isApplyingCloudSyncRef.current = false; }, 600);
+      } catch (err) {
+        console.error('Initial cloud hydration failed:', err);
+        if (isMounted) setSyncStatus('ERROR');
+      }
+    };
+
+    hydrateFromCloud();
+    return () => { isMounted = false; };
+  }, [currentUser?.username]);
+
+  // 2. Debounced Cloud Push on Workspace Mutations
+  useEffect(() => {
+    if (!currentUser || currentUser.username === 'demo' || !isInitialSyncDoneRef.current || isApplyingCloudSyncRef.current) return;
+
+    if (syncDebounceTimerRef.current) {
+      clearTimeout(syncDebounceTimerRef.current);
+    }
+
+    syncDebounceTimerRef.current = setTimeout(async () => {
+      setSyncStatus('SYNCING');
+      const bundle: WorkspaceSyncState = {
+        projects: projects.filter(p => !isDemoProject(p)),
+        deletedProjectIds: getDeletedProjectIds(),
+        activeProjectId,
+        allTrackers: allTrackers.filter(t => t.project_id !== DEMO_PROJECT.id && t.project_id !== 100),
+        selectedTrackerId,
+        allFolders,
+        allObjects: allObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000)),
+        relationships,
+        testSteps,
+        artifacts,
+        testRuns: testRuns.filter(r => r.project_id !== DEMO_PROJECT.id && r.project_id !== 100),
+        testRunDetailsMap,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentUser.username || 'zewd'
+      };
+
+      const success = await pushGlobalStateToCloud(bundle, currentUser.username || 'zewd');
+      if (success) {
+        setSyncStatus('SYNCED');
+        setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      } else {
+        setSyncStatus('ERROR');
+      }
+    }, 1200);
+
+    return () => {
+      if (syncDebounceTimerRef.current) clearTimeout(syncDebounceTimerRef.current);
+    };
+  }, [
+    projects,
+    activeProjectId,
+    allTrackers,
+    selectedTrackerId,
+    allFolders,
+    allObjects,
+    relationships,
+    testSteps,
+    artifacts,
+    testRuns,
+    testRunDetailsMap,
+    currentUser?.username
+  ]);
+
+  // 3. Re-Sync on Window Focus, Visibility Change, and Periodic Heartbeat (for seamless multi-browser synchronization)
+  useEffect(() => {
+    if (!currentUser || currentUser.username === 'demo') return;
+
+    const checkForRemoteUpdates = async () => {
+      if (isApplyingCloudSyncRef.current) return;
+      try {
+        const cloud = await fetchGlobalStateFromCloud(currentUser.username || 'zewd');
+        if (!cloud || !Array.isArray(cloud.projects)) return;
+
+        // Compare project count and object count to see if another browser made changes
+        const currentProjectCount = projects.filter(p => !isDemoProject(p)).length;
+        const currentObjectCount = allObjects.filter(o => !String(o.object_key).startsWith('DEMO-')).length;
+
+        const remoteProjectCount = cloud.projects.filter(p => !isDemoProject(p)).length;
+        const remoteObjectCount = (cloud.allObjects || []).filter(o => !String(o.object_key).startsWith('DEMO-')).length;
+
+        if (remoteProjectCount !== currentProjectCount || remoteObjectCount !== currentObjectCount) {
+          isApplyingCloudSyncRef.current = true;
+          setProjects(cloud.projects);
+          if (Array.isArray(cloud.allTrackers)) setAllTrackers(cloud.allTrackers);
+          if (Array.isArray(cloud.allFolders)) setAllFolders(cloud.allFolders);
+          if (Array.isArray(cloud.allObjects)) setAllObjects(cloud.allObjects);
+          if (Array.isArray(cloud.relationships)) setRelationships(cloud.relationships);
+          if (Array.isArray(cloud.testSteps)) setTestSteps(cloud.testSteps);
+          if (Array.isArray(cloud.artifacts)) setArtifacts(cloud.artifacts);
+          if (Array.isArray(cloud.testRuns)) setTestRuns(cloud.testRuns);
+          if (cloud.testRunDetailsMap) setTestRunDetailsMap(cloud.testRunDetailsMap);
+
+          // Update local cache
+          try {
+            localStorage.setItem('roboserv_elm_projects', JSON.stringify(cloud.projects));
+            if (cloud.allTrackers) localStorage.setItem('roboserv_elm_trackers', JSON.stringify(cloud.allTrackers));
+            if (cloud.allFolders) localStorage.setItem('roboserv_elm_folders', JSON.stringify(cloud.allFolders));
+            if (cloud.allObjects) localStorage.setItem('roboserv_elm_objects', JSON.stringify(cloud.allObjects));
+            if (cloud.relationships) localStorage.setItem('roboserv_elm_relationships', JSON.stringify(cloud.relationships));
+            if (cloud.testSteps) localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(cloud.testSteps));
+            if (cloud.artifacts) localStorage.setItem('roboserv_elm_artifacts', JSON.stringify(cloud.artifacts));
+            if (cloud.testRuns) localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(cloud.testRuns));
+            if (cloud.testRunDetailsMap) localStorage.setItem('roboserv_elm_test_run_details', JSON.stringify(cloud.testRunDetailsMap));
+          } catch (e) {}
+
+          setSyncStatus('SYNCED');
+          setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+          setTimeout(() => { isApplyingCloudSyncRef.current = false; }, 600);
+        }
+      } catch (e) {}
+    };
+
+    const handleWindowFocus = () => { checkForRemoteUpdates(); };
+    window.addEventListener('focus', handleWindowFocus);
+    document.addEventListener('visibilitychange', handleWindowFocus);
+
+    const interval = setInterval(checkForRemoteUpdates, 15000); // 15s gentle poll
+
+    return () => {
+      window.removeEventListener('focus', handleWindowFocus);
+      document.removeEventListener('visibilitychange', handleWindowFocus);
+      clearInterval(interval);
+    };
+  }, [currentUser?.username, projects.length, allObjects.length]);
+
+  // 4. Force Sync Handler
+  const handleForceSync = async () => {
+    if (!currentUser || currentUser.username === 'demo') return;
+    setSyncStatus('SYNCING');
+    try {
+      const cloudState = await fetchGlobalStateFromCloud(currentUser.username || 'zewd');
+      const localBundle: WorkspaceSyncState = {
+        projects: projects.filter(p => !isDemoProject(p)),
+        deletedProjectIds: getDeletedProjectIds(),
+        activeProjectId,
+        allTrackers: allTrackers.filter(t => t.project_id !== DEMO_PROJECT.id && t.project_id !== 100),
+        selectedTrackerId,
+        allFolders,
+        allObjects: allObjects.filter(o => !String(o.object_key).startsWith('DEMO-') && (o.tracker_id < 100000 || o.tracker_id >= 101000)),
+        relationships,
+        testSteps,
+        artifacts,
+        testRuns: testRuns.filter(r => r.project_id !== DEMO_PROJECT.id && r.project_id !== 100),
+        testRunDetailsMap,
+        lastUpdated: new Date().toISOString(),
+        updatedBy: currentUser.username || 'zewd'
+      };
+
+      const { merged } = mergeLocalAndCloudState(localBundle, cloudState);
+      isApplyingCloudSyncRef.current = true;
+      setProjects(merged.projects);
+      setAllTrackers(merged.allTrackers);
+      setAllFolders(merged.allFolders);
+      setAllObjects(merged.allObjects);
+      setRelationships(merged.relationships);
+      setTestSteps(merged.testSteps);
+      setArtifacts(merged.artifacts);
+      setTestRuns(merged.testRuns);
+      setTestRunDetailsMap(merged.testRunDetailsMap);
+
+      try {
+        localStorage.setItem('roboserv_elm_projects', JSON.stringify(merged.projects));
+        localStorage.setItem('roboserv_elm_trackers', JSON.stringify(merged.allTrackers));
+        localStorage.setItem('roboserv_elm_folders', JSON.stringify(merged.allFolders));
+        localStorage.setItem('roboserv_elm_objects', JSON.stringify(merged.allObjects));
+        localStorage.setItem('roboserv_elm_relationships', JSON.stringify(merged.relationships));
+        localStorage.setItem('roboserv_elm_test_steps', JSON.stringify(merged.testSteps));
+        localStorage.setItem('roboserv_elm_artifacts', JSON.stringify(merged.artifacts));
+        localStorage.setItem('roboserv_elm_test_runs', JSON.stringify(merged.testRuns));
+        localStorage.setItem('roboserv_elm_test_run_details', JSON.stringify(merged.testRunDetailsMap));
+      } catch (e) {}
+
+      await pushGlobalStateToCloud(merged, currentUser.username || 'zewd');
+      setSyncStatus('SYNCED');
+      setLastSyncedAt(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }));
+      setTimeout(() => { isApplyingCloudSyncRef.current = false; }, 600);
+    } catch (e) {
+      console.error('Force sync error:', e);
+      setSyncStatus('ERROR');
+    }
+  };
 
   // Sync browser Back/Forward navigation with URL
   useEffect(() => {
@@ -1984,6 +2253,9 @@ export const App: React.FC = () => {
           setSearchQuery={setSearchQuery}
           onLogout={handleLogout}
           onBackToProjects={handleBackToProjectsPortal}
+          syncStatus={syncStatus}
+          lastSyncedAt={lastSyncedAt}
+          onForceSync={handleForceSync}
         />
         <AdminConsoleView
           currentUser={currentUser}
@@ -2014,6 +2286,9 @@ export const App: React.FC = () => {
         onCreateProject={handleCreateProject}
         onUpdateProject={handleUpdateProject}
         onDeleteProject={handleDeleteProject}
+        syncStatus={syncStatus}
+        lastSyncedAt={lastSyncedAt}
+        onForceSync={handleForceSync}
       />
     );
   }
@@ -2033,6 +2308,9 @@ export const App: React.FC = () => {
         onLogout={handleLogout}
         onOpenAdminConsole={() => setAdminMode('CONSOLE')}
         onBackToProjects={handleBackToProjectsPortal}
+        syncStatus={syncStatus}
+        lastSyncedAt={lastSyncedAt}
+        onForceSync={handleForceSync}
       />
 
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>

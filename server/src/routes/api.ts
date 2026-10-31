@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { store } from '../db/store';
 import { createProjectTrackers } from '../db/canonicalTrackers';
+import { getCloudState, saveCloudState, WorkspaceSyncState } from '../db/persistentStorage';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -17,6 +18,49 @@ try {
   // Ignore filesystem error in serverless environment
 }
 const upload = multer({ dest: uploadDir });
+
+// --- GLOBAL WORKSPACE STATE SYNCHRONIZATION ---
+router.get('/sync/state', async (req, res) => {
+  try {
+    const account = (req.query.account as string) || 'zewd';
+    const cloudState = await getCloudState(account);
+    if (cloudState) {
+      return res.json({ success: true, state: cloudState });
+    }
+    return res.json({
+      success: true,
+      state: null,
+      message: 'No cloud state found yet. Initializing from client.'
+    });
+  } catch (err: any) {
+    console.error('Failed to get cloud state:', err);
+    return res.status(500).json({ error: err.message || 'Internal sync error' });
+  }
+});
+
+router.post('/sync/state', async (req, res) => {
+  try {
+    const { account = 'zewd', state } = req.body;
+    if (!state || !Array.isArray(state.projects)) {
+      return res.status(400).json({ error: 'Invalid state bundle provided' });
+    }
+    const fullState: WorkspaceSyncState = {
+      ...state,
+      lastUpdated: new Date().toISOString(),
+      updatedBy: account
+    };
+    const saved = await saveCloudState(account, fullState);
+    return res.json({
+      success: saved,
+      timestamp: fullState.lastUpdated,
+      projectCount: state.projects.length,
+      objectCount: state.allObjects?.length || 0
+    });
+  } catch (err: any) {
+    console.error('Failed to save cloud state:', err);
+    return res.status(500).json({ error: err.message || 'Internal sync save error' });
+  }
+});
 
 // --- PROJECTS & TRACKERS ---
 router.get('/projects', (req, res) => {

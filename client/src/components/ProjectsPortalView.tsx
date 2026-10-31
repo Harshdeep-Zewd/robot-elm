@@ -14,6 +14,9 @@ interface ProjectsPortalViewProps {
   onCreateProject: (data: { key: string; name: string; description?: string }) => void;
   onUpdateProject?: (id: number, updates: Partial<Project>) => void;
   onDeleteProject?: (id: number) => void;
+  syncStatus?: 'IDLE' | 'SYNCING' | 'SYNCED' | 'ERROR';
+  lastSyncedAt?: string | null;
+  onForceSync?: () => void;
 }
 
 export const ProjectsPortalView: React.FC<ProjectsPortalViewProps> = ({
@@ -26,7 +29,10 @@ export const ProjectsPortalView: React.FC<ProjectsPortalViewProps> = ({
   onSelectProject,
   onCreateProject,
   onUpdateProject,
-  onDeleteProject
+  onDeleteProject,
+  syncStatus = 'SYNCED',
+  lastSyncedAt,
+  onForceSync
 }) => {
   const [search, setSearch] = useState('');
   
@@ -148,7 +154,38 @@ export const ProjectsPortalView: React.FC<ProjectsPortalViewProps> = ({
           </span>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+          {/* Cloud Sync Status Indicator for Non-Demo */}
+          {currentUser?.username !== 'demo' && (
+            <button
+              onClick={onForceSync}
+              title={syncStatus === 'SYNCING' ? 'Synchronizing globally across all browsers...' : `Global Cloud Synchronized (${lastSyncedAt || 'Live'}). Click to sync now.`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '5px 12px',
+                borderRadius: '20px',
+                backgroundColor: syncStatus === 'ERROR' ? 'rgba(239, 68, 68, 0.15)' : (syncStatus === 'SYNCING' ? 'rgba(56, 189, 248, 0.15)' : 'rgba(16, 185, 129, 0.12)'),
+                border: `1px solid ${syncStatus === 'ERROR' ? 'rgba(239, 68, 68, 0.4)' : (syncStatus === 'SYNCING' ? 'rgba(56, 189, 248, 0.4)' : 'rgba(16, 185, 129, 0.35)')}`,
+                color: syncStatus === 'ERROR' ? '#f87171' : (syncStatus === 'SYNCING' ? '#38bdf8' : '#34d399'),
+                fontSize: '0.8rem',
+                fontWeight: 700,
+                cursor: 'pointer',
+                transition: 'all 0.2s ease'
+              }}
+            >
+              <span style={{
+                width: '8px',
+                height: '8px',
+                borderRadius: '50%',
+                backgroundColor: syncStatus === 'SYNCING' ? '#38bdf8' : (syncStatus === 'ERROR' ? '#ef4444' : '#10b981'),
+                boxShadow: syncStatus === 'SYNCING' ? '0 0 8px #38bdf8' : '0 0 6px #10b981'
+              }} />
+              {syncStatus === 'SYNCING' ? 'Syncing...' : (syncStatus === 'ERROR' ? 'Sync Error' : `Global Synced ${lastSyncedAt ? '• ' + lastSyncedAt : ''}`)}
+            </button>
+          )}
+
           {/* User Badge & Logout */}
           <div style={{
             display: 'flex',
