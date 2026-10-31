@@ -14,6 +14,7 @@ import { RequirementEditDashboard } from './RequirementEditDashboard';
 import { EnterpriseCreateModal } from './EnterpriseCreateModal';
 import { CustomColumnCard } from './CustomColumnCard';
 import { createNewTabHandlers } from '../utils/tabOpener';
+import { SearchableItemSelect } from './SearchableItemSelect';
 
 interface TrackerTableViewProps {
   tracker: Tracker;
@@ -25,7 +26,8 @@ interface TrackerTableViewProps {
   testSteps?: TestStep[];
   artifacts?: Artifact[];
   testRuns?: any[];
-  onCreateFolder?: (tracker_id: number, name: string) => number | void;
+  highlightObjectId?: number | null;
+  onCreateFolder?: (tracker_id: number, name: string, parent_id?: number | null) => number | void;
   onCreateObject: (data: {
     tracker_id: number;
     folder_id?: number | null;
@@ -76,6 +78,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   testSteps = [],
   artifacts = [],
   testRuns = [],
+  highlightObjectId,
   onCreateFolder,
   onCreateObject,
   onUpdateObject,
@@ -109,6 +112,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   });
 
   const [selectedObjectId, setSelectedObjectId] = useState<number | null>(() => {
+    if (highlightObjectId) return highlightObjectId;
     try {
       const params = new URLSearchParams(window.location.search);
       const objParam = params.get('object');
@@ -121,6 +125,46 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   });
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+
+  // Universal open / navigate handler for any linked item
+  const handleOpenObject = (targetObjId: number) => {
+    const targetObj = allObjects.find(o => o.id === targetObjId);
+    if (!targetObj) return;
+
+    if (targetObj.tracker_id === tracker.id) {
+      setSelectedObjectId(targetObj.id);
+      if (targetObj.folder_id) {
+        setExpandedFolderIds(prev => Array.from(new Set([...prev, targetObj.folder_id!])));
+      }
+      setTimeout(() => {
+        const el = document.getElementById(`req-card-${targetObj.id}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    } else {
+      const targetTracker = allTrackers?.find(t => t.id === targetObj.tracker_id);
+      if (targetTracker && onNavigateTracker) {
+        onNavigateTracker(targetTracker, targetObj.id);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (highlightObjectId) {
+      setSelectedObjectId(highlightObjectId);
+      const targetObj = allObjects.find(o => o.id === highlightObjectId);
+      if (targetObj && targetObj.folder_id) {
+        setExpandedFolderIds(prev => Array.from(new Set([...prev, targetObj.folder_id!])));
+      }
+      setTimeout(() => {
+        const el = document.getElementById(`req-card-${highlightObjectId}`);
+        if (el) {
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 100);
+    }
+  }, [highlightObjectId]);
 
   // Folder Expansion State (Left Panel - Vertical series of folders with dropdowns)
   const [expandedFolderIds, setExpandedFolderIds] = useState<number[]>(() => {
@@ -150,6 +194,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   // Create Folder Modal State
   const [showFolderModal, setShowFolderModal] = useState(false);
   const [newFolderName, setNewFolderName] = useState('');
+  const [folderParentId, setFolderParentId] = useState<number | null>(null);
 
   // Link Relationship Modal State (Right Panel)
   const [showLinkModal, setShowLinkModal] = useState(false);
@@ -271,7 +316,12 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   // Filter items in Left Panel and Middle Panel
   let filteredObjects = objects;
   if (selectedFolderId !== null) {
-    filteredObjects = filteredObjects.filter(o => o.folder_id === selectedFolderId);
+    const getDescendantFolderIds = (id: number): number[] => {
+      const children = folders.filter(f => f.parent_id === id).map(f => f.id);
+      return [id, ...children.flatMap(getDescendantFolderIds)];
+    };
+    const targetFolderIds = getDescendantFolderIds(selectedFolderId);
+    filteredObjects = filteredObjects.filter(o => o.folder_id !== undefined && o.folder_id !== null && targetFolderIds.includes(o.folder_id));
   }
   if (statusFilter) {
     filteredObjects = filteredObjects.filter(o => o.status === statusFilter);
@@ -475,12 +525,16 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   const handleCreateFolderSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newFolderName.trim() || !onCreateFolder) return;
-    const createdId = onCreateFolder(tracker.id, newFolderName.trim());
+    const createdId = onCreateFolder(tracker.id, newFolderName.trim(), folderParentId);
     if (typeof createdId === 'number') {
       setSelectedFolderId(createdId);
       setExpandedFolderIds(prev => [...prev, createdId]);
+      if (folderParentId) {
+        setExpandedFolderIds(prev => Array.from(new Set([...prev, folderParentId])));
+      }
     }
     setNewFolderName('');
+    setFolderParentId(null);
     setShowFolderModal(false);
   };
 
@@ -850,74 +904,125 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                 )}
               </div>
 
-              {/* Folders List in Series (Top to Down) */}
-              {folders.map(folder => {
-                const folderObjects = objects.filter(o => o.folder_id === folder.id);
-                const isExpanded = expandedFolderIds.includes(folder.id);
-                const isFolderActive = selectedFolderId === folder.id;
+              {/* Folders List in Series / Hierarchy (Top to Down with Subfolders) */}
+              {(() => {
+                const rootFolders = folders.filter(f => !f.parent_id || !folders.some(p => p.id === f.parent_id));
 
-                return (
-                  <div
-                    key={folder.id}
-                    style={{
-                      borderRadius: '6px',
-                      border: isFolderActive ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
-                      backgroundColor: isFolderActive ? 'rgba(56, 189, 248, 0.06)' : 'var(--bg-card)',
-                      overflow: 'hidden'
-                    }}
-                  >
-                    {/* Folder Header - Click toggles dropdown */}
+                const renderFolderNode = (folder: FolderType, depth = 0): React.ReactNode => {
+                  const folderObjects = objects.filter(o => o.folder_id === folder.id);
+                  const childFolders = folders.filter(f => f.parent_id === folder.id);
+                  const isExpanded = expandedFolderIds.includes(folder.id);
+                  const isFolderActive = selectedFolderId === folder.id;
+
+                  const getSubfolderObjCount = (fId: number): number => {
+                    const direct = objects.filter(o => o.folder_id === fId).length;
+                    const children = folders.filter(f => f.parent_id === fId);
+                    return direct + children.reduce((acc, c) => acc + getSubfolderObjCount(c.id), 0);
+                  };
+                  const totalCount = getSubfolderObjCount(folder.id);
+
+                  return (
                     <div
-                      onClick={() => {
-                        setSelectedFolderId(folder.id);
-                        toggleFolderDropdown(folder.id);
-                      }}
+                      key={folder.id}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '9px 12px',
-                        cursor: 'pointer',
-                        fontSize: '0.85rem',
-                        fontWeight: 700,
-                        color: isFolderActive ? 'var(--accent-cyan)' : 'var(--text-main)'
+                        marginLeft: `${depth * 14}px`,
+                        borderRadius: '6px',
+                        border: isFolderActive ? '1px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+                        backgroundColor: isFolderActive ? 'rgba(56, 189, 248, 0.06)' : 'var(--bg-card)',
+                        overflow: 'hidden',
+                        position: 'relative'
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                        <Folder size={16} color={isFolderActive ? 'var(--accent-cyan)' : 'var(--accent-amber)'} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '170px' }}>
-                          {folder.name}
-                        </span>
+                      {depth > 0 && (
+                        <div style={{
+                          position: 'absolute',
+                          left: '0',
+                          top: '0',
+                          bottom: '0',
+                          width: '3px',
+                          backgroundColor: isFolderActive ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.15)'
+                        }} />
+                      )}
+
+                      {/* Folder Header - Click toggles dropdown and filters */}
+                      <div
+                        onClick={() => {
+                          setSelectedFolderId(folder.id);
+                          toggleFolderDropdown(folder.id);
+                        }}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: depth > 0 ? '7px 10px' : '9px 12px',
+                          cursor: 'pointer',
+                          fontSize: depth > 0 ? '0.8rem' : '0.85rem',
+                          fontWeight: isFolderActive ? 700 : 600,
+                          color: isFolderActive ? 'var(--accent-cyan)' : 'var(--text-main)',
+                          gap: '6px'
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                          {(childFolders.length > 0 || folderObjects.length > 0) ? (
+                            isExpanded ? <ChevronDown size={14} style={{ flexShrink: 0 }} /> : <ChevronRight size={14} style={{ flexShrink: 0 }} />
+                          ) : (
+                            <span style={{ width: '14px', flexShrink: 0 }} />
+                          )}
+                          <Folder size={depth > 0 ? 14 : 16} color={isFolderActive ? 'var(--accent-cyan)' : 'var(--accent-amber)'} style={{ flexShrink: 0 }} />
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={folder.name}>
+                            {depth > 0 ? `↳ ${folder.name}` : folder.name}
+                          </span>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                          {/* Quick Add Subfolder Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setFolderParentId(folder.id);
+                              setShowFolderModal(true);
+                            }}
+                            title={`Add subfolder inside "${folder.name}"`}
+                            style={{
+                              border: 'none',
+                              backgroundColor: 'transparent',
+                              color: 'var(--text-muted)',
+                              cursor: 'pointer',
+                              padding: '2px 4px',
+                              borderRadius: '4px',
+                              display: 'flex',
+                              alignItems: 'center'
+                            }}
+                            onMouseEnter={e => (e.currentTarget.style.color = 'var(--accent-cyan)')}
+                            onMouseLeave={e => (e.currentTarget.style.color = 'var(--text-muted)')}
+                          >
+                            <FolderPlus size={13} />
+                          </button>
+
+                          <span style={{
+                            fontSize: '0.68rem',
+                            backgroundColor: 'var(--bg-dark)',
+                            padding: '2px 6px',
+                            borderRadius: '10px',
+                            color: 'var(--text-muted)'
+                          }} title={`${folderObjects.length} direct, ${totalCount} total in tree`}>
+                            {totalCount}
+                          </span>
+                        </div>
                       </div>
 
-                      <span style={{
-                        fontSize: '0.7rem',
-                        backgroundColor: 'var(--bg-dark)',
-                        padding: '2px 7px',
-                        borderRadius: '10px',
-                        color: 'var(--text-muted)'
-                      }}>
-                        {folderObjects.length}
-                      </span>
-                    </div>
-
-                    {/* Folder Dropdown: Requirements List */}
-                    {isExpanded && (
-                      <div style={{
-                        padding: '6px 8px 8px 24px',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: '4px',
-                        borderTop: '1px solid var(--border-color)',
-                        backgroundColor: 'var(--bg-dark)'
-                      }}>
-                        {folderObjects.length === 0 ? (
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '6px 0' }}>
-                            Empty folder
-                          </div>
-                        ) : (
-                          folderObjects.map(obj => {
+                      {/* Folder Dropdown: Requirements List & Subfolders */}
+                      {isExpanded && (
+                        <div style={{
+                          padding: '6px 8px 8px 12px',
+                          display: 'flex',
+                          flexDirection: 'column',
+                          gap: '6px',
+                          borderTop: '1px solid var(--border-color)',
+                          backgroundColor: 'var(--bg-dark)'
+                        }}>
+                          {folderObjects.map(obj => {
                             const isSelected = selectedObjectId === obj.id;
                             const objTabHandlers = createNewTabHandlers(
                               {
@@ -934,7 +1039,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                 key={obj.id}
                                 {...objTabHandlers}
                                 style={{
-                                  padding: '6px 8px',
+                                  padding: '5px 8px',
                                   borderRadius: '4px',
                                   backgroundColor: isSelected ? 'rgba(56, 189, 248, 0.15)' : 'transparent',
                                   borderLeft: isSelected ? '3px solid var(--accent-cyan)' : '3px solid transparent',
@@ -953,13 +1058,27 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obj.title}</span>
                               </div>
                             );
-                          })
-                        )}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                          })}
+
+                          {folderObjects.length === 0 && childFolders.length === 0 && (
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', padding: '4px 6px' }}>
+                              Empty folder
+                            </div>
+                          )}
+
+                          {childFolders.length > 0 && (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginTop: '2px' }}>
+                              {childFolders.map(child => renderFolderNode(child, depth + 1))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                };
+
+                return rootFolders.map(folder => renderFolderNode(folder, 0));
+              })()}
 
             </div>
           </div>
@@ -1696,19 +1815,32 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                         }}
                                       >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                          <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '2px 7px', borderRadius: '4px' }}>
-                                            {run.key}
-                                          </span>
-                                          <div>
-                                            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)' }}>
-                                              {run.name}
-                                            </div>
-                                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
-                                              <span>Tester: <strong>{run.tester_name}</strong></span>
-                                              <span>•</span>
-                                              <span>Date: {run.started_at ? new Date(run.started_at).toLocaleString() : 'Recent'}</span>
-                                              <span>•</span>
-                                              <span>Config: {run.config_name}</span>
+                                          <div
+                                            onClick={() => {
+                                              if (onNavigateToTestRun) {
+                                                onNavigateToTestRun(run.id);
+                                              } else if (onNavigateView) {
+                                                onNavigateView('TEST_EXECUTION');
+                                              }
+                                            }}
+                                            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+                                            title="Click to open this Test Run in the Execution dashboard"
+                                          >
+                                            <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '2px 7px', borderRadius: '4px', textDecoration: 'underline' }}>
+                                              {run.key}
+                                            </span>
+                                            <div>
+                                              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                <span>{run.name}</span>
+                                                <ExternalLink size={12} color="var(--accent-cyan)" />
+                                              </div>
+                                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                                <span>Tester: <strong>{run.tester_name}</strong></span>
+                                                <span>•</span>
+                                                <span>Date: {run.started_at ? new Date(run.started_at).toLocaleString() : 'Recent'}</span>
+                                                <span>•</span>
+                                                <span>Config: {run.config_name}</span>
+                                              </div>
                                             </div>
                                           </div>
                                         </div>
@@ -1820,13 +1952,18 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                         fontSize: '0.82rem'
                                       }}
                                     >
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden' }}>
-                                        <span className="mono" style={{ color: 'var(--accent-cyan)', fontWeight: 800, flexShrink: 0 }}>
+                                      <div
+                                        onClick={() => item.tc && handleOpenObject(item.tc.id)}
+                                        style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden', cursor: item.tc ? 'pointer' : 'default' }}
+                                        title={item.tc ? `Open test case [${item.tc.object_key}] ${item.tc.title}` : undefined}
+                                      >
+                                        <span className="mono" style={{ color: 'var(--accent-cyan)', fontWeight: 800, flexShrink: 0, textDecoration: item.tc ? 'underline' : 'none' }}>
                                           [{item.tc?.object_key}]
                                         </span>
                                         <span style={{ color: 'var(--text-main)', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {item.tc?.title}
                                         </span>
+                                        {item.tc && <ExternalLink size={12} color="var(--accent-cyan)" style={{ flexShrink: 0, opacity: 0.8 }} />}
                                         <span style={{
                                           fontSize: '0.68rem',
                                           color: 'var(--text-muted)',
@@ -2318,9 +2455,26 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               <X size={12} />
                             </button>
                           </div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: 600 }}>
-                            <span className="mono" style={{ color: 'var(--accent-cyan)', marginRight: '6px' }}>[{targetObj?.object_key || 'OBJ'}]</span>
-                            {targetObj?.title || 'Linked Target'}
+                          <div
+                            onClick={() => targetObj && handleOpenObject(targetObj.id)}
+                            style={{
+                              fontSize: '0.78rem',
+                              color: 'var(--text-main)',
+                              fontWeight: 600,
+                              cursor: targetObj ? 'pointer' : 'default',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                            title={targetObj ? `Open [${targetObj.object_key}] ${targetObj.title}` : undefined}
+                          >
+                            <span className="mono" style={{ color: 'var(--accent-cyan)', textDecoration: targetObj ? 'underline' : 'none', flexShrink: 0 }}>
+                              [{targetObj?.object_key || 'OBJ'}]
+                            </span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                              {targetObj?.title || 'Linked Target'}
+                            </span>
+                            {targetObj && <ExternalLink size={12} color="var(--accent-cyan)" style={{ flexShrink: 0, opacity: 0.8 }} />}
                           </div>
                         </div>
                       );
@@ -2357,9 +2511,26 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               <X size={12} />
                             </button>
                           </div>
-                          <div style={{ fontSize: '0.78rem', color: 'var(--text-main)', fontWeight: 600 }}>
-                            <span className="mono" style={{ color: 'var(--accent-amber)', marginRight: '6px' }}>[{sourceObj?.object_key || 'OBJ'}]</span>
-                            {sourceObj?.title || 'Source Object'}
+                          <div
+                            onClick={() => sourceObj && handleOpenObject(sourceObj.id)}
+                            style={{
+                              fontSize: '0.78rem',
+                              color: 'var(--text-main)',
+                              fontWeight: 600,
+                              cursor: sourceObj ? 'pointer' : 'default',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '6px'
+                            }}
+                            title={sourceObj ? `Open [${sourceObj.object_key}] ${sourceObj.title}` : undefined}
+                          >
+                            <span className="mono" style={{ color: 'var(--accent-amber)', textDecoration: sourceObj ? 'underline' : 'none', flexShrink: 0 }}>
+                              [{sourceObj?.object_key || 'OBJ'}]
+                            </span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                              {sourceObj?.title || 'Source Object'}
+                            </span>
+                            {sourceObj && <ExternalLink size={12} color="var(--accent-amber)" style={{ flexShrink: 0, opacity: 0.8 }} />}
                           </div>
                         </div>
                       );
@@ -2519,10 +2690,10 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
             padding: '24px'
           }}>
             <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '14px', color: 'var(--accent-cyan)' }}>
-              Create New Folder
+              Create New Folder / Subfolder
             </h3>
             <form onSubmit={handleCreateFolderSubmit}>
-              <div style={{ marginBottom: '16px' }}>
+              <div style={{ marginBottom: '14px' }}>
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
                   Folder Name *
                 </label>
@@ -2533,12 +2704,46 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   onChange={(e) => setNewFolderName(e.target.value)}
                   style={{ width: '100%' }}
                   placeholder="e.g. Navigation Subsystem Specs"
+                  autoFocus
                 />
               </div>
+
+              <div style={{ marginBottom: '18px' }}>
+                <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
+                  Parent Folder (Optional — choose to create a subfolder)
+                </label>
+                <select
+                  value={folderParentId ?? ''}
+                  onChange={(e) => setFolderParentId(e.target.value ? Number(e.target.value) : null)}
+                  style={{ width: '100%' }}
+                >
+                  <option value="">📁 None (Top-Level Root Folder)</option>
+                  {(() => {
+                    const renderFolderOptions = (parentId: number | null = null, depth = 0): React.ReactNode[] => {
+                      const childFolders = folders.filter(f => (parentId === null ? (!f.parent_id || !folders.some(p => p.id === f.parent_id)) : f.parent_id === parentId));
+                      return childFolders.flatMap(f => [
+                        <option key={f.id} value={f.id}>
+                          {'\u00A0'.repeat(depth * 4)}{depth > 0 ? '↳ ' : '📁 '}{f.name}
+                        </option>,
+                        ...renderFolderOptions(f.id, depth + 1)
+                      ]);
+                    };
+                    return renderFolderOptions(null, 0);
+                  })()}
+                </select>
+                <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                  Select an existing folder to nest this as a subfolder, or leave as Top-Level.
+                </p>
+              </div>
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                 <button
                   type="button"
-                  onClick={() => setShowFolderModal(false)}
+                  onClick={() => {
+                    setShowFolderModal(false);
+                    setNewFolderName('');
+                    setFolderParentId(null);
+                  }}
                   style={{ padding: '8px 16px', borderRadius: '6px', backgroundColor: 'var(--bg-dark)', color: 'var(--text-main)', border: 'none', cursor: 'pointer' }}
                 >
                   Cancel
@@ -2547,7 +2752,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   type="submit"
                   style={{ padding: '8px 18px', borderRadius: '6px', backgroundColor: 'var(--primary)', color: '#fff', fontWeight: 700, border: 'none', cursor: 'pointer' }}
                 >
-                  Create Folder
+                  Create {folderParentId ? 'Subfolder' : 'Folder'}
                 </button>
               </div>
             </form>
@@ -2602,19 +2807,13 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
                   Target Engineering Object *
                 </label>
-                <select
-                  required
-                  value={targetObjId || ''}
-                  onChange={(e) => setTargetObjId(Number(e.target.value) || null)}
-                  style={{ width: '100%' }}
-                >
-                  <option value="">Select target object to trace...</option>
-                  {allObjects.filter(o => o.id !== activeObject.id).map(o => (
-                    <option key={o.id} value={o.id}>
-                      [{o.object_key}] {o.title} ({o.type})
-                    </option>
-                  ))}
-                </select>
+                <SearchableItemSelect
+                  items={allObjects}
+                  selectedId={targetObjId}
+                  onSelect={(id) => setTargetObjId(id)}
+                  excludeId={activeObject.id}
+                  placeholder="Search target requirement, test case, or risk by ID or title..."
+                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>

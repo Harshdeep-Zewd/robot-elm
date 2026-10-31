@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { X, Save, Link as LinkIcon, Trash2, ArrowRight, ArrowLeft, Plus, ListOrdered, FileText, Download, Paperclip, Layers, CheckSquare, UploadCloud } from 'lucide-react';
+import { X, Save, Link as LinkIcon, Trash2, ArrowRight, ArrowLeft, Plus, ListOrdered, FileText, Download, Paperclip, Layers, CheckSquare, UploadCloud, ExternalLink } from 'lucide-react';
 import { EngineeringObject, RequirementType, SafetyLevel, TestSubProcess, Folder as FolderType, Relationship, TestStep, Artifact, Tracker } from '../types/elm';
+import { SearchableItemSelect } from './SearchableItemSelect';
 
 interface ObjectDetailPaneProps {
   objectId: number;
@@ -21,6 +22,7 @@ interface ObjectDetailPaneProps {
   onAddArtifact?: (data: { object_id?: number; filename: string; category: any; file_size?: number; stored_path?: string }) => void;
   onDeleteArtifact?: (id: number) => void;
   onSelectForImpact?: (objId: number) => void;
+  onNavigateToObject?: (objectId: number) => void;
 }
 
 export const ObjectDetailPane: React.FC<ObjectDetailPaneProps> = ({
@@ -41,7 +43,8 @@ export const ObjectDetailPane: React.FC<ObjectDetailPaneProps> = ({
   onDeleteTestStep,
   onAddArtifact,
   onDeleteArtifact,
-  onSelectForImpact
+  onSelectForImpact,
+  onNavigateToObject
 }) => {
   const isTestCase = tracker?.enable_test_steps ?? (object?.type === 'TEST_CASE' || object?.object_key.startsWith('SYS-TST'));
   const isTestSet = object?.type === 'TEST_SET' || object?.object_key.startsWith('TST-SET');
@@ -562,9 +565,37 @@ Author: Zewd (Lead Systems Engineer)
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                        <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
-                          {tcObj.object_key}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
+                            {tcObj.object_key}
+                          </span>
+                          {onNavigateToObject && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onNavigateToObject(tcObj.id);
+                              }}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '3px',
+                                backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                                border: '1px solid rgba(56, 189, 248, 0.3)',
+                                color: 'var(--accent-cyan)',
+                                padding: '1px 6px',
+                                borderRadius: '4px',
+                                fontSize: '0.7rem',
+                                fontWeight: 700,
+                                cursor: 'pointer'
+                              }}
+                              title={`Open test case [${tcObj.object_key}]`}
+                            >
+                              <ExternalLink size={10} />
+                              <span>Open</span>
+                            </button>
+                          )}
+                        </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
                             {tcSteps.length} Steps
@@ -613,18 +644,12 @@ Author: Zewd (Lead Systems Engineer)
               {availableTestCases.length > 0 ? (
                 <form onSubmit={handleAddTestCaseToSetSubmit}>
                   <div style={{ marginBottom: '12px' }}>
-                    <select
-                      value={addTestCaseId || ''}
-                      onChange={(e) => setAddTestCaseId(Number(e.target.value))}
-                      style={{ width: '100%', fontSize: '0.85rem' }}
-                    >
-                      <option value="">Select Test Case to Include...</option>
-                      {availableTestCases.map(tc => (
-                        <option key={tc.id} value={tc.id}>
-                          {tc.object_key} - {tc.title} ({tc.priority})
-                        </option>
-                      ))}
-                    </select>
+                    <SearchableItemSelect
+                      items={availableTestCases}
+                      selectedId={addTestCaseId}
+                      onSelect={(id) => setAddTestCaseId(id)}
+                      placeholder="Search test case to include by ID or title..."
+                    />
                   </div>
 
                   <button
@@ -961,9 +986,16 @@ Author: Zewd (Lead Systems Engineer)
                   const target = allObjects.find(o => o.id === rel.target_id);
                   return (
                     <div key={rel.id} style={{ backgroundColor: 'var(--bg-dark)', padding: '10px 12px', borderRadius: '8px', marginBottom: '8px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
+                      <div
+                        onClick={() => target && onNavigateToObject && onNavigateToObject(target.id)}
+                        style={{ cursor: target && onNavigateToObject ? 'pointer' : 'default', flex: 1 }}
+                        title={target ? `Click to open [${target.object_key}] ${target.title}` : undefined}
+                      >
                         <div style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', fontWeight: 700 }}>{rel.relationship_type}</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }} className="mono">{target?.object_key}</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '5px' }} className="mono">
+                          <span>{target?.object_key}</span>
+                          {target && <ExternalLink size={12} />}
+                        </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>{target?.title}</div>
                       </div>
                       {onDeleteRelationship && (
@@ -993,9 +1025,16 @@ Author: Zewd (Lead Systems Engineer)
                   const source = allObjects.find(o => o.id === rel.source_id);
                   return (
                     <div key={rel.id} style={{ backgroundColor: 'var(--bg-dark)', padding: '10px 12px', borderRadius: '8px', marginBottom: '8px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <div>
+                      <div
+                        onClick={() => source && onNavigateToObject && onNavigateToObject(source.id)}
+                        style={{ cursor: source && onNavigateToObject ? 'pointer' : 'default', flex: 1 }}
+                        title={source ? `Click to open [${source.object_key}] ${source.title}` : undefined}
+                      >
                         <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>{rel.relationship_type} BY</div>
-                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }} className="mono">{source?.object_key}</div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '5px' }} className="mono">
+                          <span>{source?.object_key}</span>
+                          {source && <ExternalLink size={12} />}
+                        </div>
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-main)' }}>{source?.title}</div>
                       </div>
                       {onDeleteRelationship && (
@@ -1079,21 +1118,13 @@ Author: Zewd (Lead Systems Engineer)
                 <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '6px' }}>
                   Select Target Object ID *
                 </label>
-                <select
-                  required
-                  value={targetObjId || ''}
-                  onChange={(e) => setTargetObjId(Number(e.target.value))}
-                  style={{ width: '100%' }}
-                >
-                  <option value="">Select Target Object ID...</option>
-                  {allObjects
-                    .filter(o => o.id !== activeObject.id)
-                    .map(o => (
-                      <option key={o.id} value={o.id}>
-                        {o.object_key} - {o.title} ({o.type})
-                      </option>
-                    ))}
-                </select>
+                <SearchableItemSelect
+                  items={allObjects}
+                  selectedId={targetObjId}
+                  onSelect={(id) => setTargetObjId(id)}
+                  excludeId={activeObject.id}
+                  placeholder="Search target requirement, test case, or item..."
+                />
               </div>
 
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>

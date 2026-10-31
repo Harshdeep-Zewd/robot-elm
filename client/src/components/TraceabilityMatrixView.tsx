@@ -9,6 +9,7 @@ interface TraceabilityMatrixViewProps {
   relationships: Relationship[];
   onAddRelationship: (source_id: number, target_id: number, type: string) => void;
   onDeleteRelationship: (id: number) => void;
+  onNavigateTracker?: (tracker: Tracker, objectId?: number) => void;
 }
 
 export const TraceabilityMatrixView: React.FC<TraceabilityMatrixViewProps> = ({
@@ -16,7 +17,8 @@ export const TraceabilityMatrixView: React.FC<TraceabilityMatrixViewProps> = ({
   allObjects,
   relationships,
   onAddRelationship,
-  onDeleteRelationship
+  onDeleteRelationship,
+  onNavigateTracker
 }) => {
   const [sourceTrackerId, setSourceTrackerId] = useState<number>(trackers[0]?.id || 1);
   const [targetTrackerId, setTargetTrackerId] = useState<number>(trackers[4]?.id || trackers[0]?.id || 5);
@@ -133,12 +135,15 @@ export const TraceabilityMatrixView: React.FC<TraceabilityMatrixViewProps> = ({
                     objectId: target.id,
                     objectKey: target.object_key,
                     label: `[${target.object_key}] ${target.title}`
+                  }, () => {
+                    const trk = trackers.find(t => t.id === target.tracker_id);
+                    if (trk && onNavigateTracker) onNavigateTracker(trk, target.id);
                   });
                   return (
                     <th
                       key={target.id}
                       {...targetHandlers}
-                      title={`[${target.object_key}] ${target.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
+                      title={`[${target.object_key}] ${target.title}\n💡 Click to open | [Ctrl + Right-Click] Open in new tab`}
                       style={{ padding: '12px', fontSize: '0.8rem', minWidth: '130px', cursor: 'pointer' }}
                     >
                       <div style={{ color: 'var(--accent-cyan)', fontWeight: 700 }} className="mono">{target.object_key}</div>
@@ -158,12 +163,15 @@ export const TraceabilityMatrixView: React.FC<TraceabilityMatrixViewProps> = ({
                   objectId: source.id,
                   objectKey: source.object_key,
                   label: `[${source.object_key}] ${source.title}`
+                }, () => {
+                  const trk = trackers.find(t => t.id === source.tracker_id);
+                  if (trk && onNavigateTracker) onNavigateTracker(trk, source.id);
                 });
                 return (
                   <tr key={source.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
                     <td
                       {...sourceHandlers}
-                      title={`[${source.object_key}] ${source.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
+                      title={`[${source.object_key}] ${source.title}\n💡 Click to open | [Ctrl + Right-Click] Open in new tab`}
                       style={{ padding: '12px 16px', textAlign: 'left', backgroundColor: 'var(--bg-sidebar)', cursor: 'pointer' }}
                     >
                       <div style={{ fontWeight: 700, color: 'var(--accent-cyan)' }} className="mono">{source.object_key}</div>

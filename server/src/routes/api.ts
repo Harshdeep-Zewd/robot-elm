@@ -88,6 +88,23 @@ router.get('/trackers/:trackerId/folders', (req, res) => {
   res.json(pFolders);
 });
 
+router.post('/folders', (req, res) => {
+  const { tracker_id, parent_id, name } = req.body;
+  if (!tracker_id || !name) {
+    return res.status(400).json({ error: 'tracker_id and name are required' });
+  }
+  const existing = store.folders.filter(f => f.tracker_id === Number(tracker_id));
+  const newFolder = {
+    id: Date.now(),
+    tracker_id: Number(tracker_id),
+    parent_id: parent_id ? Number(parent_id) : null,
+    name: String(name).trim(),
+    position: existing.length + 1
+  };
+  store.folders.push(newFolder);
+  res.status(201).json(newFolder);
+});
+
 router.get('/trackers/:trackerId/objects', (req, res) => {
   const tId = Number(req.params.trackerId);
   const { folderId, search, status, priority } = req.query;

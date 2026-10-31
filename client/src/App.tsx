@@ -778,6 +778,19 @@ export const App: React.FC = () => {
     return getNonDemoObjects();
   });
 
+  const [highlightObjectId, setHighlightObjectId] = useState<number | null>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const objParam = params.get('object');
+      if (objParam) {
+        const loadedObjects = isDemo ? initialDemoBundle.demoObjects : getNonDemoObjects();
+        const foundObj = loadedObjects.find(o => String(o.id) === objParam || o.object_key.toLowerCase() === objParam.toLowerCase());
+        if (foundObj) return foundObj.id;
+      }
+    } catch (e) {}
+    return null;
+  });
+
   const [relationships, setRelationships] = useState<Relationship[]>(() => {
     if (isDemo) return initialDemoBundle.demoRelationships;
     return getInitialData('relationships', INITIAL_RELATIONSHIPS);
@@ -1444,12 +1457,12 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleCreateFolder = (tracker_id: number, name: string) => {
+  const handleCreateFolder = (tracker_id: number, name: string, parent_id?: number | null) => {
     const existing = allFolders.filter(f => f.tracker_id === tracker_id);
     const newFolder: Folder = {
       id: Date.now(),
       tracker_id,
-      parent_id: null,
+      parent_id: parent_id ?? null,
       name: name.trim(),
       position: existing.length + 1
     };
@@ -2060,6 +2073,7 @@ export const App: React.FC = () => {
               testSteps={testSteps}
               artifacts={currentProjectArtifacts}
               testRuns={testRuns}
+              highlightObjectId={highlightObjectId}
               onCreateFolder={handleCreateFolder}
               onCreateObject={handleCreateObject}
               onUpdateObject={handleUpdateObject}
@@ -2075,6 +2089,7 @@ export const App: React.FC = () => {
               onNavigateToTestRun={handleNavigateToTestRun}
               onNavigateTracker={(tracker, objId) => {
                 setSelectedTrackerId(tracker.id);
+                setHighlightObjectId(objId ?? null);
                 setActiveView('TRACKER');
               }}
               onNavigateView={(view) => setActiveView(view)}
@@ -2089,6 +2104,11 @@ export const App: React.FC = () => {
               relationships={relationships}
               onAddRelationship={handleAddRelationship}
               onDeleteRelationship={handleDeleteRelationship}
+              onNavigateTracker={(tracker, objId) => {
+                setSelectedTrackerId(tracker.id);
+                setHighlightObjectId(objId ?? null);
+                setActiveView('TRACKER');
+              }}
             />
           )}
 

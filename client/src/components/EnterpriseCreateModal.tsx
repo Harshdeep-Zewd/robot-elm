@@ -8,6 +8,7 @@ import {
   SafetyLevel, TestSubProcess
 } from '../types/elm';
 import { cleanTrackerName } from '../data/canonicalTrackers';
+import { SearchableItemSelect } from './SearchableItemSelect';
 
 interface EnterpriseCreateModalProps {
   isOpen: boolean;
@@ -405,9 +406,18 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
                     style={{ width: '100%', fontSize: '0.8rem', padding: '6px 10px' }}
                   >
                     <option value="">-- None (Tracker Root) --</option>
-                    {folders.map(f => (
-                      <option key={f.id} value={f.id}>{f.name}</option>
-                    ))}
+                    {(() => {
+                      const renderFolderOptions = (parentId: number | null = null, depth = 0): React.ReactNode[] => {
+                        const childFolders = folders.filter(f => (parentId === null ? (!f.parent_id || !folders.some(p => p.id === f.parent_id)) : f.parent_id === parentId));
+                        return childFolders.flatMap(f => [
+                          <option key={f.id} value={f.id}>
+                            {'\u00A0'.repeat(depth * 4)}{depth > 0 ? '↳ ' : '📁 '}{f.name}
+                          </option>,
+                          ...renderFolderOptions(f.id, depth + 1)
+                        ]);
+                      };
+                      return renderFolderOptions(null, 0);
+                    })()}
                   </select>
                 </div>
 
@@ -737,18 +747,14 @@ export const EnterpriseCreateModal: React.FC<EnterpriseCreateModalProps> = ({
               <option value="mitigated by">mitigated by</option>
             </select>
 
-            <select
-              value={assocTargetId || ''}
-              onChange={(e) => setAssocTargetId(e.target.value ? Number(e.target.value) : null)}
-              style={{ flex: 1, minWidth: '220px', fontSize: '0.78rem', padding: '5px 8px' }}
-            >
-              <option value="">Select target item...</option>
-              {allObjects.map(obj => (
-                <option key={obj.id} value={obj.id}>
-                  [{obj.object_key}] {obj.title} ({obj.type})
-                </option>
-              ))}
-            </select>
+            <div style={{ flex: 1, minWidth: '260px' }}>
+              <SearchableItemSelect
+                items={allObjects}
+                selectedId={assocTargetId}
+                onSelect={(id) => setAssocTargetId(id)}
+                placeholder="Search target requirement or item..."
+              />
+            </div>
           </div>
         </div>
 
