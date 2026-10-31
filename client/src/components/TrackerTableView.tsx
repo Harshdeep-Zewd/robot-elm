@@ -126,6 +126,83 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
 
+  // Resizable Side Panels State (persisted to localStorage)
+  const [leftPanelWidth, setLeftPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('roboserv_tracker_left_panel_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 180 && parsed <= 750) return parsed;
+      }
+    } catch (e) {}
+    return 320;
+  });
+
+  const [rightPanelWidth, setRightPanelWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('roboserv_tracker_right_panel_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 220 && parsed <= 850) return parsed;
+      }
+    } catch (e) {}
+    return 380;
+  });
+
+  const [isResizingLeft, setIsResizingLeft] = useState(false);
+  const [isResizingRight, setIsResizingRight] = useState(false);
+  const leftPanelWidthRef = useRef(leftPanelWidth);
+  const rightPanelWidthRef = useRef(rightPanelWidth);
+  leftPanelWidthRef.current = leftPanelWidth;
+  rightPanelWidthRef.current = rightPanelWidth;
+
+  useEffect(() => {
+    if (!isResizingLeft && !isResizingRight) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const container = document.getElementById('tracker-3panel-container');
+      if (!container) return;
+      const rect = container.getBoundingClientRect();
+
+      if (isResizingLeft) {
+        const newWidth = Math.max(180, Math.min(e.clientX - rect.left, 750));
+        leftPanelWidthRef.current = newWidth;
+        setLeftPanelWidth(newWidth);
+      } else if (isResizingRight) {
+        const newWidth = Math.max(220, Math.min(rect.right - e.clientX, 850));
+        rightPanelWidthRef.current = newWidth;
+        setRightPanelWidth(newWidth);
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingLeft) {
+        setIsResizingLeft(false);
+        try {
+          localStorage.setItem('roboserv_tracker_left_panel_width', String(leftPanelWidthRef.current));
+        } catch (e) {}
+      }
+      if (isResizingRight) {
+        setIsResizingRight(false);
+        try {
+          localStorage.setItem('roboserv_tracker_right_panel_width', String(rightPanelWidthRef.current));
+        } catch (e) {}
+      }
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizingLeft, isResizingRight]);
+
   // Universal open / navigate handler for any linked item
   const handleOpenObject = (targetObjId: number) => {
     const targetObj = allObjects.find(o => o.id === targetObjId);
@@ -733,15 +810,14 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
       {/* ══════════════════════════════════════════════════════════════════
           3-PANEL SPLIT WORKSPACE
           ══════════════════════════════════════════════════════════════════ */}
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div id="tracker-3panel-container" style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
 
         {/* ──────────────────────────────────────────────────────────────────
             LEFT PANEL: Folders in Series (Top to Down) with Dropdowns (Point 2)
             ────────────────────────────────────────────────────────────────── */}
         <div style={{
-          width: '320px',
+          width: `${leftPanelWidth}px`,
           flexShrink: 0,
-          borderRight: '1px solid var(--border-color)',
           backgroundColor: 'var(--bg-sidebar)',
           display: 'flex',
           flexDirection: 'column',
@@ -895,8 +971,8 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                             }}
                             title={`[${obj.object_key}] ${obj.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
                           >
-                            <span className="mono" style={{ fontSize: '0.72rem', opacity: 0.85 }}>[{obj.object_key}]</span>
-                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obj.title}</span>
+                            <span className="mono" style={{ fontSize: '0.72rem', opacity: 0.85, flexShrink: 0 }}>[{obj.object_key}]</span>
+                            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{obj.title}</span>
                           </div>
                         );
                       })}
@@ -1054,8 +1130,8 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                 }}
                                 title={`[${obj.object_key}] ${obj.title}\n💡 [Ctrl + Right-Click] Open in new tab`}
                               >
-                                <span className="mono" style={{ fontSize: '0.72rem', opacity: 0.85 }}>[{obj.object_key}]</span>
-                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{obj.title}</span>
+                                <span className="mono" style={{ fontSize: '0.72rem', opacity: 0.85, flexShrink: 0 }}>[{obj.object_key}]</span>
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{obj.title}</span>
                               </div>
                             );
                           })}
@@ -1082,6 +1158,49 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
 
             </div>
           </div>
+        </div>
+
+        {/* LEFT PANEL RESIZER SPLITTER (Drag to resize / Double-click to reset) */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsResizingLeft(true);
+          }}
+          onDoubleClick={() => {
+            setLeftPanelWidth(320);
+            try { localStorage.setItem('roboserv_tracker_left_panel_width', '320'); } catch (e) {}
+          }}
+          title="Drag with mouse cursor to resize Left Panel (Double-click to reset)"
+          style={{
+            width: '6px',
+            cursor: 'col-resize',
+            backgroundColor: isResizingLeft ? 'var(--accent-cyan)' : 'transparent',
+            borderRight: isResizingLeft ? '2px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+            transition: 'background-color 0.15s ease',
+            position: 'relative',
+            zIndex: 10,
+            flexShrink: 0,
+            userSelect: 'none'
+          }}
+          onMouseEnter={(e) => {
+            if (!isResizingLeft) e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.35)';
+          }}
+          onMouseLeave={(e) => {
+            if (!isResizingLeft) e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          {/* Visual vertical grip bar */}
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '2px',
+            height: '32px',
+            borderRadius: '2px',
+            backgroundColor: isResizingLeft ? 'var(--accent-cyan)' : 'var(--text-muted)',
+            opacity: 0.6
+          }} />
         </div>
 
         {/* ──────────────────────────────────────────────────────────────────
@@ -2178,13 +2297,55 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
           )}
         </div>
 
+        {/* RIGHT PANEL RESIZER SPLITTER (Drag to resize / Double-click to reset) */}
+        <div
+          onMouseDown={(e) => {
+            e.preventDefault();
+            setIsResizingRight(true);
+          }}
+          onDoubleClick={() => {
+            setRightPanelWidth(380);
+            try { localStorage.setItem('roboserv_tracker_right_panel_width', '380'); } catch (e) {}
+          }}
+          title="Drag with mouse cursor to resize Right Inspection Panel (Double-click to reset)"
+          style={{
+            width: '6px',
+            cursor: 'col-resize',
+            backgroundColor: isResizingRight ? 'var(--accent-cyan)' : 'transparent',
+            borderLeft: isResizingRight ? '2px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+            transition: 'background-color 0.15s ease',
+            position: 'relative',
+            zIndex: 10,
+            flexShrink: 0,
+            userSelect: 'none'
+          }}
+          onMouseEnter={(e) => {
+            if (!isResizingRight) e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.35)';
+          }}
+          onMouseLeave={(e) => {
+            if (!isResizingRight) e.currentTarget.style.backgroundColor = 'transparent';
+          }}
+        >
+          {/* Visual vertical grip bar */}
+          <div style={{
+            position: 'absolute',
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '2px',
+            height: '32px',
+            borderRadius: '2px',
+            backgroundColor: isResizingRight ? 'var(--accent-cyan)' : 'var(--text-muted)',
+            opacity: 0.6
+          }} />
+        </div>
+
         {/* ──────────────────────────────────────────────────────────────────
             RIGHT PANEL: Features, Traceability & Artifacts
             ────────────────────────────────────────────────────────────────── */}
         <div style={{
-          width: '380px',
+          width: `${rightPanelWidth}px`,
           flexShrink: 0,
-          borderLeft: '1px solid var(--border-color)',
           backgroundColor: 'var(--bg-card)',
           display: 'flex',
           flexDirection: 'column',

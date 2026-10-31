@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   LayoutDashboard,
   FileText,
@@ -186,17 +186,62 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setTimeout(() => setRequestSuccessMsg(''), 4000);
   };
 
+  // Resizable Sidebar width state (persisted to localStorage)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('roboserv_sidebar_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 180 && parsed <= 550) return parsed;
+      }
+    } catch (e) {}
+    return 240;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(180, Math.min(e.clientX, 550));
+      sidebarWidthRef.current = newWidth;
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      try {
+        localStorage.setItem('roboserv_sidebar_width', String(sidebarWidthRef.current));
+      } catch (e) {}
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
+
   return (
-    <aside style={{
-      width: '240px',
-      backgroundColor: 'var(--bg-sidebar)',
-      borderRight: '1px solid var(--border-color)',
-      display: 'flex',
-      flexDirection: 'column',
-      height: 'calc(100vh - 60px)',
-      overflowY: 'auto',
-      padding: '16px 12px'
-    }}>
+    <div style={{ display: 'flex', height: 'calc(100vh - 60px)', flexShrink: 0, position: 'relative' }}>
+      <aside style={{
+        width: `${sidebarWidth}px`,
+        backgroundColor: 'var(--bg-sidebar)',
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        overflowY: 'auto',
+        padding: '16px 12px'
+      }}>
       {requestSuccessMsg && (
         <div style={{
           backgroundColor: 'rgba(16, 185, 129, 0.15)',
@@ -1079,5 +1124,48 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
       )}
     </aside>
+
+    {/* RESIZER SPLITTER FOR MAIN NAVIGATION SIDEBAR */}
+    <div
+      onMouseDown={(e) => {
+        e.preventDefault();
+        setIsResizing(true);
+      }}
+      onDoubleClick={() => {
+        setSidebarWidth(240);
+        try { localStorage.setItem('roboserv_sidebar_width', '240'); } catch (e) {}
+      }}
+      title="Drag with mouse cursor to resize Sidebar (Double-click to reset)"
+      style={{
+        width: '6px',
+        cursor: 'col-resize',
+        backgroundColor: isResizing ? 'var(--accent-cyan)' : 'transparent',
+        borderRight: isResizing ? '2px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+        transition: 'background-color 0.15s ease',
+        position: 'relative',
+        zIndex: 10,
+        flexShrink: 0,
+        userSelect: 'none'
+      }}
+      onMouseEnter={(e) => {
+        if (!isResizing) e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.35)';
+      }}
+      onMouseLeave={(e) => {
+        if (!isResizing) e.currentTarget.style.backgroundColor = 'transparent';
+      }}
+    >
+      <div style={{
+        position: 'absolute',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: '2px',
+        height: '32px',
+        borderRadius: '2px',
+        backgroundColor: isResizing ? 'var(--accent-cyan)' : 'var(--text-muted)',
+        opacity: 0.6
+      }} />
+    </div>
+  </div>
   );
 };

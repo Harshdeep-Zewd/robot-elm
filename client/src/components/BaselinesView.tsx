@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { FolderArchive, Plus, CheckCircle2, FileText, GitCompare } from 'lucide-react';
 import { api } from '../api/client';
 import { Baseline } from '../types/elm';
@@ -10,6 +10,51 @@ export const BaselinesView: React.FC = () => {
   const [name, setName] = useState('');
   const [versionTag, setVersionTag] = useState('');
   const [desc, setDesc] = useState('');
+
+  // Resizable Sidebar width state (persisted to localStorage)
+  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('roboserv_baselines_sidebar_width');
+      if (saved) {
+        const parsed = parseInt(saved, 10);
+        if (!isNaN(parsed) && parsed >= 200 && parsed <= 550) return parsed;
+      }
+    } catch (e) {}
+    return 300;
+  });
+
+  const [isResizing, setIsResizing] = useState(false);
+  const sidebarWidthRef = useRef(sidebarWidth);
+  sidebarWidthRef.current = sidebarWidth;
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      const newWidth = Math.max(200, Math.min(e.clientX, 550));
+      sidebarWidthRef.current = newWidth;
+      setSidebarWidth(newWidth);
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      try {
+        localStorage.setItem('roboserv_baselines_sidebar_width', String(sidebarWidthRef.current));
+      } catch (e) {}
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+  }, [isResizing]);
 
   useEffect(() => {
     loadBaselines();
@@ -43,7 +88,7 @@ export const BaselinesView: React.FC = () => {
   return (
     <div style={{ display: 'flex', height: 'calc(100vh - 60px)', overflow: 'hidden' }}>
       {/* Sidebar List */}
-      <div style={{ width: '300px', borderRight: '1px solid var(--border-color)', backgroundColor: 'var(--bg-sidebar)', padding: '16px 12px', overflowY: 'auto' }}>
+      <div style={{ width: `${sidebarWidth}px`, flexShrink: 0, backgroundColor: 'var(--bg-sidebar)', padding: '16px 12px', overflowY: 'auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
           <span style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', color: 'var(--text-muted)' }}>Baselines & Freezes</span>
           <button
@@ -74,6 +119,48 @@ export const BaselinesView: React.FC = () => {
             </div>
           </div>
         ))}
+      </div>
+
+      {/* RESIZER SPLITTER */}
+      <div
+        onMouseDown={(e) => {
+          e.preventDefault();
+          setIsResizing(true);
+        }}
+        onDoubleClick={() => {
+          setSidebarWidth(300);
+          try { localStorage.setItem('roboserv_baselines_sidebar_width', '300'); } catch (e) {}
+        }}
+        title="Drag with mouse cursor to resize Sidebar (Double-click to reset)"
+        style={{
+          width: '6px',
+          cursor: 'col-resize',
+          backgroundColor: isResizing ? 'var(--accent-cyan)' : 'transparent',
+          borderRight: isResizing ? '2px solid var(--accent-cyan)' : '1px solid var(--border-color)',
+          transition: 'background-color 0.15s ease',
+          position: 'relative',
+          zIndex: 10,
+          flexShrink: 0,
+          userSelect: 'none'
+        }}
+        onMouseEnter={(e) => {
+          if (!isResizing) e.currentTarget.style.backgroundColor = 'rgba(56, 189, 248, 0.35)';
+        }}
+        onMouseLeave={(e) => {
+          if (!isResizing) e.currentTarget.style.backgroundColor = 'transparent';
+        }}
+      >
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)',
+          width: '2px',
+          height: '32px',
+          borderRadius: '2px',
+          backgroundColor: isResizing ? 'var(--accent-cyan)' : 'var(--text-muted)',
+          opacity: 0.6
+        }} />
       </div>
 
       {/* Main Detail Area */}
