@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { X, Save, Link as LinkIcon, Trash2, ArrowRight, ArrowLeft, Plus, ListOrdered, FileText, Download, Paperclip, Layers, CheckSquare, UploadCloud, ExternalLink } from 'lucide-react';
 import { EngineeringObject, RequirementType, SafetyLevel, TestSubProcess, Folder as FolderType, Relationship, TestStep, Artifact, Tracker } from '../types/elm';
 import { SearchableItemSelect } from './SearchableItemSelect';
+import { createNewTabHandlers } from '../utils/tabOpener';
 
 interface ObjectDetailPaneProps {
   objectId: number;
@@ -569,32 +570,42 @@ Author: Zewd (Lead Systems Engineer)
                           <span className="mono" style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>
                             {tcObj.object_key}
                           </span>
-                          {onNavigateToObject && (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onNavigateToObject(tcObj.id);
-                              }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '3px',
-                                backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                                border: '1px solid rgba(56, 189, 248, 0.3)',
-                                color: 'var(--accent-cyan)',
-                                padding: '1px 6px',
-                                borderRadius: '4px',
-                                fontSize: '0.7rem',
-                                fontWeight: 700,
-                                cursor: 'pointer'
-                              }}
-                              title={`Open test case [${tcObj.object_key}]`}
-                            >
-                              <ExternalLink size={10} />
-                              <span>Open</span>
-                            </button>
-                          )}
+                          {onNavigateToObject && (() => {
+                            const tcTabHandlers = createNewTabHandlers({
+                              view: 'TRACKER',
+                              trackerId: tcObj.tracker_id,
+                              objectId: tcObj.id,
+                              objectKey: tcObj.object_key,
+                              label: `[${tcObj.object_key}] ${tcObj.title}`
+                            }, (e) => {
+                              e.stopPropagation();
+                              onNavigateToObject(tcObj.id);
+                            });
+
+                            return (
+                              <button
+                                type="button"
+                                {...tcTabHandlers}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '3px',
+                                  backgroundColor: 'rgba(56, 189, 248, 0.12)',
+                                  border: '1px solid rgba(56, 189, 248, 0.3)',
+                                  color: 'var(--accent-cyan)',
+                                  padding: '1px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '0.7rem',
+                                  fontWeight: 700,
+                                  cursor: 'pointer'
+                                }}
+                                title={`[${tcObj.object_key}] ${tcObj.title}\n💡 Click to open | [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab`}
+                              >
+                                <ExternalLink size={10} />
+                                <span>Open</span>
+                              </button>
+                            );
+                          })()}
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                           <span style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', backgroundColor: 'rgba(16, 185, 129, 0.1)', padding: '2px 6px', borderRadius: '4px' }}>
@@ -984,12 +995,20 @@ Author: Zewd (Lead Systems Engineer)
               {outgoingLinks.length > 0 ? (
                 outgoingLinks.map(rel => {
                   const target = allObjects.find(o => o.id === rel.target_id);
+                  const targetTabHandlers = target ? createNewTabHandlers({
+                    view: 'TRACKER',
+                    trackerId: target.tracker_id,
+                    objectId: target.id,
+                    objectKey: target.object_key,
+                    label: `[${target.object_key}] ${target.title}`
+                  }, () => target && onNavigateToObject && onNavigateToObject(target.id)) : {};
+
                   return (
                     <div key={rel.id} style={{ backgroundColor: 'var(--bg-dark)', padding: '10px 12px', borderRadius: '8px', marginBottom: '8px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div
-                        onClick={() => target && onNavigateToObject && onNavigateToObject(target.id)}
+                        {...targetTabHandlers}
                         style={{ cursor: target && onNavigateToObject ? 'pointer' : 'default', flex: 1 }}
-                        title={target ? `Click to open [${target.object_key}] ${target.title}` : undefined}
+                        title={target ? `[${target.object_key}] ${target.title}\n💡 Click to open | [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab` : undefined}
                       >
                         <div style={{ fontSize: '0.7rem', color: 'var(--accent-amber)', fontWeight: 700 }}>{rel.relationship_type}</div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '5px' }} className="mono">
@@ -1023,12 +1042,20 @@ Author: Zewd (Lead Systems Engineer)
               {incomingLinks.length > 0 ? (
                 incomingLinks.map(rel => {
                   const source = allObjects.find(o => o.id === rel.source_id);
+                  const sourceTabHandlers = source ? createNewTabHandlers({
+                    view: 'TRACKER',
+                    trackerId: source.tracker_id,
+                    objectId: source.id,
+                    objectKey: source.object_key,
+                    label: `[${source.object_key}] ${source.title}`
+                  }, () => source && onNavigateToObject && onNavigateToObject(source.id)) : {};
+
                   return (
                     <div key={rel.id} style={{ backgroundColor: 'var(--bg-dark)', padding: '10px 12px', borderRadius: '8px', marginBottom: '8px', border: '1px solid var(--border-color)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div
-                        onClick={() => source && onNavigateToObject && onNavigateToObject(source.id)}
+                        {...sourceTabHandlers}
                         style={{ cursor: source && onNavigateToObject ? 'pointer' : 'default', flex: 1 }}
-                        title={source ? `Click to open [${source.object_key}] ${source.title}` : undefined}
+                        title={source ? `[${source.object_key}] ${source.title}\n💡 Click to open | [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab` : undefined}
                       >
                         <div style={{ fontSize: '0.7rem', color: 'var(--accent-emerald)', fontWeight: 700 }}>{rel.relationship_type} BY</div>
                         <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '5px' }} className="mono">

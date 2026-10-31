@@ -1934,34 +1934,45 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                         }}
                                       >
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                          <div
-                                            onClick={() => {
+                                          {(() => {
+                                            const runTabHandlers = createNewTabHandlers({
+                                              projectKey: tracker.prefix?.split('-')[0]?.toLowerCase() || 'robo',
+                                              view: 'test_execution',
+                                              runId: run.id,
+                                              label: run.name || `Test Run #${run.id}`
+                                            }, () => {
                                               if (onNavigateToTestRun) {
                                                 onNavigateToTestRun(run.id);
                                               } else if (onNavigateView) {
                                                 onNavigateView('TEST_EXECUTION');
                                               }
-                                            }}
-                                            style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
-                                            title="Click to open this Test Run in the Execution dashboard"
-                                          >
-                                            <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '2px 7px', borderRadius: '4px', textDecoration: 'underline' }}>
-                                              {run.key}
-                                            </span>
-                                            <div>
-                                              <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                                                <span>{run.name}</span>
-                                                <ExternalLink size={12} color="var(--accent-cyan)" />
+                                            });
+
+                                            return (
+                                              <div
+                                                {...runTabHandlers}
+                                                style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer' }}
+                                                title={`[${run.key}] ${run.name}\n💡 Click to open | [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab`}
+                                              >
+                                                <span className="mono" style={{ fontSize: '0.8rem', fontWeight: 800, color: 'var(--accent-cyan)', backgroundColor: 'rgba(56, 189, 248, 0.12)', padding: '2px 7px', borderRadius: '4px', textDecoration: 'underline' }}>
+                                                  {run.key}
+                                                </span>
+                                                <div>
+                                                  <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                    <span>{run.name}</span>
+                                                    <ExternalLink size={12} color="var(--accent-cyan)" />
+                                                  </div>
+                                                  <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
+                                                    <span>Tester: <strong>{run.tester_name}</strong></span>
+                                                    <span>•</span>
+                                                    <span>Date: {run.started_at ? new Date(run.started_at).toLocaleString() : 'Recent'}</span>
+                                                    <span>•</span>
+                                                    <span>Config: {run.config_name}</span>
+                                                  </div>
+                                                </div>
                                               </div>
-                                              <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'flex', gap: '8px', marginTop: '2px', flexWrap: 'wrap' }}>
-                                                <span>Tester: <strong>{run.tester_name}</strong></span>
-                                                <span>•</span>
-                                                <span>Date: {run.started_at ? new Date(run.started_at).toLocaleString() : 'Recent'}</span>
-                                                <span>•</span>
-                                                <span>Config: {run.config_name}</span>
-                                              </div>
-                                            </div>
-                                          </div>
+                                            );
+                                          })()}
                                         </div>
 
                                         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -2057,6 +2068,14 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               ) : (
                                 incCases.map(item => {
                                   const stepCount = testSteps.filter(s => s.test_case_id === item.tc?.id).length;
+                                  const tcTabHandlers = item.tc ? createNewTabHandlers({
+                                    view: 'TRACKER',
+                                    trackerId: item.tc.tracker_id,
+                                    objectId: item.tc.id,
+                                    objectKey: item.tc.object_key,
+                                    label: `[${item.tc.object_key}] ${item.tc.title}`
+                                  }, () => handleOpenObject(item.tc!.id)) : {};
+
                                   return (
                                     <div
                                       key={item.relId}
@@ -2072,9 +2091,9 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                                       }}
                                     >
                                       <div
-                                        onClick={() => item.tc && handleOpenObject(item.tc.id)}
+                                        {...tcTabHandlers}
                                         style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1, overflow: 'hidden', cursor: item.tc ? 'pointer' : 'default' }}
-                                        title={item.tc ? `Open test case [${item.tc.object_key}] ${item.tc.title}` : undefined}
+                                        title={item.tc ? `[${item.tc.object_key}] ${item.tc.title}\n💡 Click to open | [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab` : undefined}
                                       >
                                         <span className="mono" style={{ color: 'var(--accent-cyan)', fontWeight: 800, flexShrink: 0, textDecoration: item.tc ? 'underline' : 'none' }}>
                                           [{item.tc?.object_key}]
@@ -2587,6 +2606,14 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {outgoingLinks.map(rel => {
                       const targetObj = allObjects.find(o => o.id === rel.target_id);
+                      const targetTabHandlers = targetObj ? createNewTabHandlers({
+                        view: 'TRACKER',
+                        trackerId: targetObj.tracker_id,
+                        objectId: targetObj.id,
+                        objectKey: targetObj.object_key,
+                        label: `[${targetObj.object_key}] ${targetObj.title}`
+                      }, () => handleOpenObject(targetObj.id)) : {};
+
                       return (
                         <div key={rel.id} style={{
                           backgroundColor: 'var(--bg-dark)',
@@ -2617,7 +2644,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                             </button>
                           </div>
                           <div
-                            onClick={() => targetObj && handleOpenObject(targetObj.id)}
+                            {...targetTabHandlers}
                             style={{
                               fontSize: '0.78rem',
                               color: 'var(--text-main)',
@@ -2627,7 +2654,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               alignItems: 'center',
                               gap: '6px'
                             }}
-                            title={targetObj ? `Open [${targetObj.object_key}] ${targetObj.title}` : undefined}
+                            title={targetObj ? `[${targetObj.object_key}] ${targetObj.title}\n💡 Click to open | [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab` : undefined}
                           >
                             <span className="mono" style={{ color: 'var(--accent-cyan)', textDecoration: targetObj ? 'underline' : 'none', flexShrink: 0 }}>
                               [{targetObj?.object_key || 'OBJ'}]
@@ -2643,6 +2670,14 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
 
                     {incomingLinks.map(rel => {
                       const sourceObj = allObjects.find(o => o.id === rel.source_id);
+                      const sourceTabHandlers = sourceObj ? createNewTabHandlers({
+                        view: 'TRACKER',
+                        trackerId: sourceObj.tracker_id,
+                        objectId: sourceObj.id,
+                        objectKey: sourceObj.object_key,
+                        label: `[${sourceObj.object_key}] ${sourceObj.title}`
+                      }, () => handleOpenObject(sourceObj.id)) : {};
+
                       return (
                         <div key={rel.id} style={{
                           backgroundColor: 'var(--bg-dark)',
@@ -2673,7 +2708,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                             </button>
                           </div>
                           <div
-                            onClick={() => sourceObj && handleOpenObject(sourceObj.id)}
+                            {...sourceTabHandlers}
                             style={{
                               fontSize: '0.78rem',
                               color: 'var(--text-main)',
@@ -2683,7 +2718,7 @@ export const TrackerTableView: React.FC<TrackerTableViewProps> = ({
                               alignItems: 'center',
                               gap: '6px'
                             }}
-                            title={sourceObj ? `Open [${sourceObj.object_key}] ${sourceObj.title}` : undefined}
+                            title={sourceObj ? `[${sourceObj.object_key}] ${sourceObj.title}\n💡 Click to open | [Ctrl + Click] or [Ctrl + Right-Click] Open in new tab` : undefined}
                           >
                             <span className="mono" style={{ color: 'var(--accent-amber)', textDecoration: sourceObj ? 'underline' : 'none', flexShrink: 0 }}>
                               [{sourceObj?.object_key || 'OBJ'}]
